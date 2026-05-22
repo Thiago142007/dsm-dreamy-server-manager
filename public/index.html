@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DSM - Dreamy Server Manager</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="dsm-shell" data-theme="green">
+    <div id="loginOverlay" class="login-overlay">
+      <form id="loginForm" class="login-card">
+        <h2>Entrar no DSM</h2>
+        <label>
+          Usuario
+          <input id="loginUsername" required />
+        </label>
+        <label>
+          Senha
+          <input id="loginPassword" type="password" required />
+        </label>
+        <button type="submit">Entrar</button>
+      </form>
+    </div>
+
+    <aside class="sidebar">
+      <div class="brand">
+        <strong>DSM</strong>
+        <span>Dreamy Server Manager</span>
+      </div>
+      <nav class="nav-links">
+        <a href="#/console" data-page-link="console" class="nav-link">Console</a>
+        <a href="#/files" data-page-link="files" class="nav-link">Files</a>
+        <a href="#/servers" id="serversNavLink" data-page-link="servers" class="nav-link is-hidden">Servers</a>
+        <a href="#/versions" data-page-link="versions" class="nav-link">Versions</a>
+        <a href="#/properties" data-page-link="properties" class="nav-link">Properties</a>
+        <a href="#/plugins" data-page-link="plugins" class="nav-link">Plugins</a>
+        <a href="#/exportimport" id="exportImportNavLink" data-page-link="exportimport" class="nav-link">Export/import</a>
+        <a href="#/settings" data-page-link="settings" class="nav-link">Settings</a>
+        <a href="#/cowork" data-page-link="cowork" class="nav-link">Cowork</a>
+        <a href="#/debug" data-page-link="debug" class="nav-link">Debug</a>
+        <a href="#/home" data-page-link="home" class="nav-link">Home</a>
+      </nav>
+      <footer class="sidebar-footer">Windows-first panel</footer>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <div>
+          <p class="topbar-kicker">DSM</p>
+          <h1 id="pageTitle">Console</h1>
+        </div>
+        <div class="topbar-status">
+          <span id="healthBadge" class="status-dot"></span>
+          <span id="healthText">Conectando...</span>
+        </div>
+      </header>
+
+      <section id="page-console" data-page="console" class="page-section">
+        <article class="panel-card">
+          <h2>Status da maquina</h2>
+          <div class="cards-grid">
+            <div class="stat-card">
+              <p>CPU</p>
+              <h3 id="cpuUsageText">0%</h3>
+            </div>
+            <div class="stat-card">
+              <p>RAM do servidor</p>
+              <h3 id="ramUsageText">0.00 GB</h3>
+            </div>
+            <div class="stat-card">
+              <p>Pasta do servidor</p>
+              <h3 id="serverSizeText">0 MB</h3>
+            </div>
+            <div class="stat-card">
+              <p>Versao do servidor</p>
+              <h3 id="serverVersionText">N/A</h3>
+            </div>
+            <div class="stat-card">
+              <p>IP do servidor</p>
+              <h3 id="serverIpText">N/A</h3>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel-card">
+          <div class="console-title-row">
+            <h2>Console do servidor</h2>
+            <div class="players-chip">
+              <span id="onlinePlayersCount">Uptime: offline</span>
+              <button id="togglePlayersButton" type="button" class="players-dot is-hidden" aria-label="Mostrar jogadores"></button>
+            </div>
+          </div>
+          <div id="consoleTargetWrap" class="console-target-wrap is-hidden">
+            <label>
+              Console alvo (BungeeCord)
+              <select id="consoleTargetSelect"></select>
+            </label>
+          </div>
+          <div id="playersPopover" class="players-popover is-hidden">
+            <ul id="playersList"></ul>
+          </div>
+          <pre id="consoleOutput" class="console-output">[SYS] Console aguardando...</pre>
+          <form id="commandForm" class="inline-form">
+            <input id="commandInput" placeholder="Comando (ex: say Hello DSM)" />
+            <button type="submit">Enviar comando</button>
+          </form>
+          <div class="power-actions">
+            <button type="button" data-power-action="start">Ligar</button>
+            <button type="button" data-power-action="stop" class="button-muted">Desligar</button>
+            <button type="button" data-power-action="restart" class="button-muted">Reiniciar</button>
+          </div>
+        </article>
+      </section>
+
+      <section id="page-files" data-page="files" class="page-section is-hidden">
+        <article id="serverFilesDropZone" class="panel-card upload-dropzone">
+          <h2>Arquivos do servidor</h2>
+          <div class="file-controls">
+            <label>
+              Diretorio atual
+              <input id="serverDirectoryInput" value="" placeholder="ex: plugins" />
+            </label>
+            <button id="backDirectoryButton" type="button" class="button-muted">Voltar</button>
+            <button id="goDirectoryButton" type="button">Ir</button>
+            <button id="upDirectoryButton" type="button" class="button-muted">Subir</button>
+            <button id="refreshServerFilesButton" type="button">Atualizar</button>
+          </div>
+
+          <div class="file-actions">
+            <label class="upload-label">
+              Upload
+              <input id="fileUploadInput" type="file" multiple />
+            </label>
+            <label class="upload-label">
+              Upload pasta
+              <input id="fileFolderUploadInput" type="file" webkitdirectory directory multiple />
+            </label>
+            <button id="selectAllFilesButton" type="button" class="button-muted">Selecionar todos</button>
+            <button id="downloadSelectedFilesButton" type="button">Baixar selecionados</button>
+            <button id="deleteSelectedFilesButton" type="button" class="button-danger">Excluir selecionados</button>
+            <button id="copySelectedFilesButton" type="button" class="button-muted">Copiar</button>
+            <button id="cutSelectedFilesButton" type="button" class="button-muted">Recortar</button>
+            <button id="pasteClipboardFilesButton" type="button">Colar aqui</button>
+          </div>
+          <p class="muted-text">Arraste arquivos ou pastas para esta aba para enviar automaticamente.</p>
+
+          <div class="file-panels">
+            <div class="panel-subgroup">
+              <h3>Itens</h3>
+              <ul id="serverItemsList"></ul>
+            </div>
+            <div class="panel-subgroup">
+              <h3>Editor</h3>
+              <p id="editingFileLabel">Nenhum arquivo selecionado.</p>
+              <textarea id="fileEditorText" rows="16" placeholder="Selecione um arquivo para editar"></textarea>
+              <div class="editor-actions">
+                <button id="saveEditedFileButton" type="button">Salvar arquivo</button>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section id="page-versions" data-page="versions" class="page-section is-hidden">
+        <article id="subServerFilesDropZone" class="panel-card upload-dropzone">
+          <h2>Versoes Paper</h2>
+          <p>Escolha se este servidor sera Paper ou BungeeCord.</p>
+          <div class="server-kind-picker">
+            <button id="selectPaperKindButton" type="button" class="button-muted">Paper</button>
+            <button id="selectBungeeKindButton" type="button" class="button-muted">BungeeCord</button>
+          </div>
+          <p id="versionsStatusText" class="muted-text">Selecione o tipo de servidor para instalar.</p>
+
+          <div id="paperInstallPanel">
+            <p>Para Paper, selecione uma versao e instale em <code>paper.jar</code>.</p>
+            <div class="versions-toolbar">
+              <select id="paperVersionSelect"></select>
+              <button id="downloadSelectedVersionButton" type="button">Instalar Paper</button>
+            </div>
+          </div>
+
+          <div id="bungeeInstallPanel" class="is-hidden">
+            <p>Para proxy BungeeCord, baixe o jar oficial e habilite a aba <strong>Servers</strong> para criar sub-servidores.</p>
+            <button id="installBungeeButton" type="button">Instalar BungeeCord</button>
+          </div>
+          <ul id="paperVersionsList" class="versions-list"></ul>
+        </article>
+      </section>
+
+      <section id="page-servers" data-page="servers" class="page-section is-hidden">
+        <article class="panel-card">
+          <h2>Sub-servidores (BungeeCord)</h2>
+          <p class="muted-text">Crie e conecte sub-servidores Paper automaticamente ao proxy.</p>
+          <form id="createSubServerForm" class="inline-form">
+            <input id="newSubServerNameInput" placeholder="Nome do sub-servidor (ex: lobby)" />
+            <select id="newSubServerVersionSelect"></select>
+            <button type="submit">Criar sub-servidor</button>
+          </form>
+          <p id="serversStatusText" class="muted-text">Selecione um sub-servidor para ver os arquivos.</p>
+          <ul id="subServersList" class="extensions-list"></ul>
+        </article>
+
+        <article class="panel-card">
+          <h2>Arquivos do sub-servidor</h2>
+          <div class="file-controls">
+            <label>
+              Diretorio atual
+              <input id="subServerDirectoryInput" value="" placeholder="ex: plugins" />
+            </label>
+            <button id="backSubDirectoryButton" type="button" class="button-muted">Voltar</button>
+            <button id="goSubDirectoryButton" type="button">Ir</button>
+            <button id="upSubDirectoryButton" type="button" class="button-muted">Subir</button>
+            <button id="refreshSubServerFilesButton" type="button">Atualizar</button>
+          </div>
+
+          <div class="file-actions">
+            <label class="upload-label">
+              Upload
+              <input id="subFileUploadInput" type="file" multiple />
+            </label>
+            <label class="upload-label">
+              Upload pasta
+              <input id="subFolderUploadInput" type="file" webkitdirectory directory multiple />
+            </label>
+            <button id="downloadSubSelectedFilesButton" type="button">Baixar selecionados</button>
+            <button id="copySubSelectedFilesButton" type="button" class="button-muted">Copiar</button>
+            <button id="cutSubSelectedFilesButton" type="button" class="button-muted">Recortar</button>
+            <button id="pasteSubClipboardFilesButton" type="button" class="button-muted">Colar</button>
+            <button id="deleteSubSelectedFilesButton" type="button" class="button-danger">Excluir selecionados</button>
+          </div>
+          <p class="muted-text">Arraste arquivos ou pastas aqui para enviar automaticamente para o sub-servidor ativo.</p>
+
+          <div class="file-panels">
+            <div class="panel-subgroup">
+              <h3>Itens</h3>
+              <ul id="subServerItemsList"></ul>
+            </div>
+            <div class="panel-subgroup">
+              <h3>Editor</h3>
+              <p id="subEditingFileLabel">Nenhum arquivo selecionado.</p>
+              <textarea id="subFileEditorText" rows="16" placeholder="Selecione um arquivo para editar"></textarea>
+              <div class="editor-actions">
+                <button id="saveSubEditedFileButton" type="button">Salvar arquivo</button>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section id="page-properties" data-page="properties" class="page-section is-hidden">
+        <article class="panel-card">
+          <h2>Propriedades do servidor</h2>
+          <div id="propertiesIconToolbar" class="properties-icon-toolbar">
+            <div class="properties-icon-preview-wrap">
+              <img
+                id="propertiesServerIconPreview"
+                class="properties-server-icon-preview is-empty"
+                alt="Preview do icone do servidor"
+                width="64"
+                height="64"
+              />
+            </div>
+            <div class="properties-icon-actions">
+              <label class="upload-label">
+                Foto do servidor
+                <input id="propertiesServerIconInput" type="file" accept="image/png,image/jpeg,image/webp,image/*" />
+              </label>
+              <p id="propertiesServerIconStatusText" class="muted-text">
+                Envie uma imagem para gerar o arquivo <code>server-icon.png</code>.
+              </p>
+            </div>
+          </div>
+          <div id="propertiesSubServerWrap" class="properties-toolbar is-hidden">
+            <label>
+              Sub-servidor (BungeeCord)
+              <select id="propertiesSubServerSelect"></select>
+            </label>
+          </div>
+          <p id="propertiesStatusText" class="muted-text">Alteracoes salvam automaticamente.</p>
+          <div id="propertiesTable" class="properties-table"></div>
+        </article>
+      </section>
+
+      <section id="page-plugins" data-page="plugins" class="page-section is-hidden">
+        <article class="panel-card">
+          <h2>Plugins</h2>
+          <p class="muted-text">Navegue por plugins populares e instale com um clique em <code>plugins/</code>.</p>
+          <form id="pluginSearchForm" class="plugins-search">
+            <input id="pluginQueryInput" placeholder="Search plugins..." />
+          </form>
+          <div class="plugins-toolbar">
+            <label>
+              Sort by
+              <select id="pluginSortSelect">
+                <option value="downloads">Downloads</option>
+                <option value="relevance">Relevance</option>
+                <option value="updated">Updated</option>
+                <option value="newest">Newest</option>
+              </select>
+            </label>
+            <label>
+              View
+              <select id="pluginViewSelect">
+                <option value="20">20</option>
+                <option value="40">40</option>
+                <option value="50">50</option>
+              </select>
+            </label>
+            <label>
+              Source
+              <select id="pluginSourceSelect">
+                <option value="modrinth">Modrinth</option>
+                <option value="spigot">Spigot</option>
+              </select>
+            </label>
+            <label id="pluginServerVersionWrap">
+              Server version
+              <input id="pluginServerVersionInput" placeholder="Ex: 1.21.11" />
+            </label>
+            <label id="pluginSubServerWrap" class="full is-hidden">
+              Sub-servidor (BungeeCord)
+              <select id="pluginSubServerSelect"></select>
+            </label>
+            <button id="pluginRefreshButton" type="button">Atualizar lista</button>
+            <div class="plugins-pagination">
+              <button id="pluginPrevPageButton" type="button" class="button-muted">◀</button>
+              <span id="pluginPageInfo">1 / 1</span>
+              <button id="pluginNextPageButton" type="button" class="button-muted">▶</button>
+            </div>
+          </div>
+          <p id="pluginsStatusText" class="muted-text">Abra a aba para carregar plugins populares.</p>
+          <ul id="pluginsResultsList" class="versions-list"></ul>
+        </article>
+      </section>
+
+      <section id="page-exportimport" data-page="exportimport" class="page-section is-hidden">
+        <article class="panel-card">
+          <h2>Export/import</h2>
+          <p class="muted-text">
+            Exporte este servidor completo (mundos, plugins, configs e arquivos) e envie para outra pessoa importar.
+          </p>
+          <div class="inline-form">
+            <button id="exportServerButton" type="button">Exportar servidor</button>
+          </div>
+        </article>
+        <article class="panel-card">
+          <h2>Importar servidor</h2>
+          <p class="muted-text">Selecione um arquivo <code>.zip</code> exportado pelo DSM (ou <code>.json</code> legado) para criar um novo servidor com o mesmo conteúdo.</p>
+          <div class="inline-form">
+            <label class="upload-label">
+              Arquivo de exportação
+              <input id="importServerFileInput" type="file" accept=".zip,.dsmexport.zip,.json,.dsmexport.json,application/zip,application/json" />
+            </label>
+            <button id="importServerButton" type="button" class="button-muted">Importar servidor</button>
+          </div>
+          <p id="exportImportStatusText" class="muted-text">Pronto para exportar/importar.</p>
+        </article>
+      </section>
+
+      <section id="page-settings" data-page="settings" class="page-section is-hidden">
+        <article class="panel-card">
+          <h2>Java Manager</h2>
+          <p class="muted-text">
+            O painel detecta o Java necessÃ¡rio por versÃ£o do Paper e pode instalar automaticamente quando faltar.
+          </p>
+          <div class="inline-form">
+            <button id="refreshJavaManagerButton" type="button" class="button-muted">Atualizar status</button>
+            <button id="installMissingJavaButton" type="button">Instalar Java faltante</button>
+          </div>
+          <p id="javaManagerStatusText" class="muted-text">Carregue o status para ver os Javas necessÃ¡rios.</p>
+          <ul id="javaManagerList" class="extensions-list"></ul>
+        </article>
+        <article class="panel-card">
+          <h2>Tema</h2>
+          <label>
+            Selecione o tema do painel
+            <select id="themeSelect">
+              <option value="green">Green</option>
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+            </select>
+          </label>
+        </article>
+        <article class="panel-card">
+          <h2>Sessao</h2>
+          <p class="muted-text">Encerrar a conta atual e voltar para a tela de login.</p>
+          <button id="logoutButton" type="button" class="button-danger">Sair da conta</button>
+        </article>
+      </section>
+
+      <section id="page-cowork" data-page="cowork" class="page-section is-hidden">
+        <article class="panel-card">
+          <h2>Cowork</h2>
+          <p class="muted-text">Compartilhe este servidor com outro usuario e defina exatamente o que ele pode fazer.</p>
+          <form id="coworkGrantForm" class="grid-form">
+            <label class="full">
+              Usuario
+              <select id="coworkTargetUser" required></select>
+            </label>
+
+            <label class="checkbox-line full"><input id="coworkPermConsoleCommand" type="checkbox" />Enviar comandos no console</label>
+            <label class="checkbox-line full"><input id="coworkPermPowerStart" type="checkbox" />Ligar o server</label>
+            <label class="checkbox-line full"><input id="coworkPermPowerStopRestart" type="checkbox" />Desligar/reiniciar o server</label>
+            <label class="checkbox-line full"><input id="coworkPermFilesRead" type="checkbox" />Ler arquivos</label>
+            <label class="checkbox-line full"><input id="coworkPermFilesEdit" type="checkbox" />Editar arquivos</label>
+            <label class="checkbox-line full"><input id="coworkPermFilesUpload" type="checkbox" />Fazer upload de arquivos</label>
+            <label class="checkbox-line full"><input id="coworkPermFilesDelete" type="checkbox" />Deletar arquivos</label>
+
+            <button type="submit">Salvar permissoes</button>
+          </form>
+          <p id="coworkStatusText" class="muted-text">Selecione um usuario e ajuste as permissoes.</p>
+        </article>
+
+        <article class="panel-card">
+          <div class="panel-inline-header">
+            <h2>Usuarios com acesso</h2>
+            <button id="refreshCoworkButton" type="button" class="button-muted">Atualizar</button>
+          </div>
+          <ul id="coworkList" class="extensions-list"></ul>
+        </article>
+      </section>
+
+      <section id="page-debug" data-page="debug" class="page-section is-hidden">
+        <article class="panel-card">
+          <div class="panel-inline-header">
+            <h2>Debug do console</h2>
+            <button id="refreshDebugButton" type="button" class="button-muted">Atualizar</button>
+          </div>
+          <p id="debugStatusText" class="muted-text">Selecione um servidor para ver os erros.</p>
+          <ul id="debugSessionsList" class="extensions-list"></ul>
+        </article>
+      </section>
+
+      <section id="page-home" data-page="home" class="page-section is-hidden">
+        <article class="panel-card">
+          <h2>Home de servidores</h2>
+          <p id="homeLimitsText" class="muted-text"></p>
+          <form id="createHomeServerForm" class="inline-form">
+            <input id="newHomeServerNameInput" placeholder="Nome do novo servidor" />
+            <button type="submit">Criar servidor</button>
+          </form>
+          <ul id="homeServersList" class="extensions-list"></ul>
+        </article>
+
+        <article id="adminPanelCard" class="panel-card is-hidden">
+          <h2>Painel Admin</h2>
+          <form id="adminCreateUserForm" class="grid-form">
+            <label>
+              Usuario
+              <input id="adminNewUsername" required />
+            </label>
+            <label>
+              Senha
+              <input id="adminNewPassword" type="password" required />
+            </label>
+            <label class="full">
+              Maximo de servidores
+              <input id="adminNewMaxServers" type="number" min="1" value="1" required />
+            </label>
+            <button type="submit">Criar conta</button>
+          </form>
+          <ul id="adminUsersList" class="extensions-list"></ul>
+        </article>
+      </section>
+    </main>
+    <div id="subServerContextMenu" class="context-menu is-hidden" role="menu" aria-label="Ações do sub-servidor">
+      <button id="subServerContextDelete" type="button" class="context-menu-item context-menu-danger">Delete</button>
+    </div>
+    <div id="fileContextMenu" class="context-menu is-hidden" role="menu" aria-label="Acoes de arquivo">
+      <button id="fileContextDelete" type="button" class="context-menu-item context-menu-danger">Delete</button>
+      <button id="fileContextCopy" type="button" class="context-menu-item">Copy</button>
+      <button id="fileContextCut" type="button" class="context-menu-item">Cut</button>
+      <button id="fileContextRename" type="button" class="context-menu-item">Rename</button>
+      <button id="fileContextExtract" type="button" class="context-menu-item is-hidden">Extract</button>
+    </div>
+    <div id="toastStack" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,55 @@
+{
+  "name": "dsm-dreamy-server-manager",
+  "version": "0.1.0",
+  "description": "DSM - Dreamy Server Manager (Windows-first)",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "desktop": "electron .",
+    "dist:win": "electron-builder --win nsis",
+    "test": "node --test --test-isolation=none"
+  },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "unzipper": "^0.12.3"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.dreamy.servermanager",
+    "productName": "Dreamy Server Manager",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "src/**/*",
+      "public/**/*",
+      "server/**/*",
+      "data/**/*",
+      "electron/**/*",
+      "package.json",
+      "README.md",
+      "dsm.cmd"
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
