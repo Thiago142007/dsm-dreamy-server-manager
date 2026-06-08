@@ -66,6 +66,16 @@ Abra:
 
 - [http://127.0.0.1:3000](http://127.0.0.1:3000)
 
+## GitHub Codespaces
+
+No Windows, execute:
+
+```powershell
+.\abrir-codespace.bat
+```
+
+O Codespace instala as dependencias, inicia o painel automaticamente e encaminha a porta `3000`.
+
 ## Testes
 
 ```powershell

@@ -1,0 +1,19 @@
+{
+  "name": "Dreamy Server Manager",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-24-bookworm",
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "DSM Panel",
+      "onAutoForward": "openBrowser",
+      "visibility": "private"
+    }
+  },
+  "postCreateCommand": "npm install",
+  "postStartCommand": "bash .devcontainer/start-dsm.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": []
+    }
+  }
+}

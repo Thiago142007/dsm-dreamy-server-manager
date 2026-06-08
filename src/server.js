@@ -4171,15 +4171,16 @@ function createServer({
       return baseUrl;
     },
 
-    async start(port = 3000) {
+    async start(port = 3000, host = process.env.HOST || "127.0.0.1") {
       if (server) return;
       await fs.mkdir(resolvedServerDir, { recursive: true });
       server = http.createServer(requestListener);
       await new Promise((resolve) => {
-        server.listen(port, "127.0.0.1", resolve);
+        server.listen(port, host, resolve);
       });
       const address = server.address();
-      baseUrl = `http://127.0.0.1:${address.port}`;
+      const baseHost = host === "0.0.0.0" || host === "::" ? "127.0.0.1" : host;
+      baseUrl = `http://${baseHost}:${address.port}`;
     },
 
     async stop() {
@@ -4210,7 +4211,8 @@ function createServer({
 async function startFromCli() {
   const app = createServer();
   const port = Number(process.env.PORT || 3000);
-  await app.start(port);
+  const host = process.env.HOST || "127.0.0.1";
+  await app.start(port, host);
   // eslint-disable-next-line no-console
   console.log(`DSM running at ${app.baseUrl}`);
 }
