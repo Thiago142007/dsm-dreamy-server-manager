@@ -44,7 +44,7 @@ Only the management UI is loopback-only by default. A later setting may expose i
 
 The app bundles a Java 21 runtime built for Android ARM64 or an Android-compatible ARM64 JVM distribution whose license permits redistribution. The runtime is extracted into app-private storage on first use.
 
-Paper runs as a child process with its working directory in app-private storage. Standard input, output, and error are connected to the Android runtime manager. Console output is retained in a bounded in-memory buffer and written to a rotating application log.
+Paper runs inside a dedicated Android service process named `:paper`, isolated from the activity and management API process. A small native JNI launcher loads the Android-compatible JVM through `libjli.so` and calls `JLI_Launch`; it does not rely on executing an extracted desktop-style `java` binary. Standard input, output, and error are connected through pipes to the Android runtime manager. Console output is retained in a bounded buffer and written to a rotating application log.
 
 The default JVM allocation is conservative and derived from available device memory. The initial selectable range is 1 GB to 4 GB, while preventing a configured maximum that would leave too little memory for Android and the app. The launch command uses `nogui` and minimal, documented JVM flags.
 
