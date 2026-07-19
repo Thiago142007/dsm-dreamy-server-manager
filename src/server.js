@@ -791,34 +791,65 @@ async function extractZipToDirectory(zipPath, destinationDir) {
   }
 }
 
-function getJavaBinaryName() {
-  return process.platform === "win32" ? "java.exe" : "java";
+function getJavaBinaryName(runtimePlatform = process.platform) {
+  return runtimePlatform === "win32" ? "java.exe" : "java";
 }
 
-function resolveAdoptiumPlatform() {
-  if (process.platform === "win32") return "windows";
-  if (process.platform === "darwin") return "mac";
-  if (process.platform === "linux") return "linux";
+function resolveAdoptiumPlatform(runtimePlatform = process.platform) {
+  if (runtimePlatform === "win32") return "windows";
+  if (runtimePlatform === "darwin") return "mac";
+  if (runtimePlatform === "linux") return "linux";
   return "";
 }
 
-function resolveAdoptiumArch() {
-  if (process.arch === "x64") return "x64";
-  if (process.arch === "arm64") return "aarch64";
+function resolveAdoptiumArch(runtimeArch = process.arch) {
+  if (runtimeArch === "x64") return "x64";
+  if (runtimeArch === "arm64") return "aarch64";
   return "";
 }
 
-function buildManagedJavaDownloadUrl(major) {
-  const platformName = resolveAdoptiumPlatform();
-  const archName = resolveAdoptiumArch();
+function buildManagedJavaDownloadUrl(major, { runtimePlatform = process.platform, runtimeArch = process.arch } = {}) {
+  const platformName = resolveAdoptiumPlatform(runtimePlatform);
+  const archName = resolveAdoptiumArch(runtimeArch);
   if (!platformName || !archName) {
-    throw new Error(`Java Manager does not support this platform yet (${process.platform}/${process.arch}).`);
+    throw new Error(`Java Manager does not support this platform yet (${runtimePlatform}/${runtimeArch}).`);
   }
   return `https://api.adoptium.net/v3/binary/latest/${major}/ga/${platformName}/${archName}/jre/hotspot/normal/eclipse`;
 }
 
-async function findJavaExecutableInDirectory(rootDir) {
-  const javaBinary = getJavaBinaryName().toLowerCase();
+function isTermuxRuntime({ runtimePlatform = process.platform, runtimeEnv = process.env } = {}) {
+  const prefix = String(runtimeEnv?.PREFIX || "");
+  return runtimePlatform === "android" || prefix.includes("/com.termux/") || prefix.includes("\\com.termux\\");
+}
+
+function getTermuxJavaPackageName(major) {
+  const safeMajor = Math.floor(Number(major || 0));
+  if (safeMajor === 8) return "openjdk-8";
+  if (safeMajor === 16 || safeMajor === 17) return "openjdk-17";
+  if (safeMajor === 21) return "openjdk-21";
+  return "";
+}
+
+function isJavaMajorCompatible(requiredMajor, installedMajor) {
+  const required = Math.floor(Number(requiredMajor || 0));
+  const installed = Math.floor(Number(installedMajor || 0));
+  if (!required || !installed) return false;
+  return installed >= required;
+}
+
+function parseJavaVersionMajor(output) {
+  const text = String(output || "");
+  const quoted = text.match(/version\s+"([^"]+)"/i);
+  const rawVersion = quoted?.[1] || text.match(/\b(\d+(?:\.\d+)+)/)?.[1] || "";
+  if (!rawVersion) return 0;
+  if (rawVersion.startsWith("1.")) {
+    return Math.floor(Number(rawVersion.split(".")[1] || 0));
+  }
+  return Math.floor(Number(rawVersion.split(".")[0] || 0));
+}
+
+async function findJavaExecutableInDirectory(rootDir, { runtimePlatform = process.platform } = {}) {
+  const javaBinary = getJavaBinaryName(runtimePlatform).toLowerCase();
   const queue = [rootDir];
   while (queue.length) {
     const currentDir = queue.shift();
@@ -1550,6 +1581,10 @@ function createServer({
   runtimeManager,
   downloadPaperVersion = defaultPaperDownloader,
   downloadBinary = defaultBinaryDownloader,
+  commandRunner = execFileAsync,
+  runtimePlatform = process.platform,
+  runtimeArch = process.arch,
+  runtimeEnv = process.env,
   searchPlugins = defaultSearchPlugins,
   resolvePluginDownload = defaultResolvePluginDownload,
   getPluginDetails = defaultGetPluginDetails,
@@ -1566,6 +1601,7 @@ function createServer({
   const debugCursorByRuntime = new WeakMap();
   const javaInstallPromisesByMajor = new Map();
   const useManagedJavaRuntimes = !runtimeManager;
+  const useTermuxJavaManager = useManagedJavaRuntimes && isTermuxRuntime({ runtimePlatform, runtimeEnv });
   let server;
   let baseUrl = "";
 
@@ -1998,8 +2034,30 @@ function createServer({
 
   async function inspectManagedJavaRuntime(major) {
     const safeMajor = Math.floor(Number(major || 0));
+    if (useTermuxJavaManager) {
+      try {
+        const commandLookup = await commandRunner("sh", ["-c", "command -v java"], { timeout: 10000 });
+        const javaPath = String(commandLookup.stdout || "").trim().split(/\r?\n/)[0] || "java";
+        const versionResult = await commandRunner(javaPath, ["-version"], { timeout: 10000 });
+        const installedMajor = parseJavaVersionMajor(`${versionResult.stdout || ""}\n${versionResult.stderr || ""}`);
+        if (!isJavaMajorCompatible(safeMajor, installedMajor)) {
+          return null;
+        }
+        return {
+          major: safeMajor,
+          installedMajor,
+          runtimeDir: path.dirname(path.dirname(javaPath)),
+          javaPath,
+          managed: true,
+          packageManager: "termux",
+        };
+      } catch (error) {
+        return null;
+      }
+    }
+
     const runtimeDir = getManagedJavaVersionDir(safeMajor);
-    const javaPath = await findJavaExecutableInDirectory(runtimeDir);
+    const javaPath = await findJavaExecutableInDirectory(runtimeDir, { runtimePlatform });
     if (!javaPath) {
       return null;
     }
@@ -2031,6 +2089,24 @@ function createServer({
       const preInstalled = await inspectManagedJavaRuntime(safeMajor);
       if (preInstalled) return preInstalled;
 
+      if (useTermuxJavaManager) {
+        const packageName = getTermuxJavaPackageName(safeMajor);
+        if (!packageName) {
+          throw new Error(`Java ${safeMajor} is not available through the Termux package manager.`);
+        }
+        try {
+          await commandRunner("sh", ["-c", "command -v pkg"], { timeout: 10000 });
+          await commandRunner("pkg", ["install", "-y", packageName], { timeout: 10 * 60 * 1000 });
+          const installed = await inspectManagedJavaRuntime(safeMajor);
+          if (!installed) {
+            throw new Error(`Termux installed ${packageName}, but a compatible java executable was not found.`);
+          }
+          return installed;
+        } catch (error) {
+          throw new Error(`Failed to install Java ${safeMajor} with Termux pkg: ${error.message}`);
+        }
+      }
+
       const runtimeDir = getManagedJavaVersionDir(safeMajor);
       const tempZipPath = path.join(
         os.tmpdir(),
@@ -2040,7 +2116,7 @@ function createServer({
       try {
         await fs.mkdir(getJavaManagerRootDir(), { recursive: true });
         await downloadBinary({
-          url: buildManagedJavaDownloadUrl(safeMajor),
+          url: buildManagedJavaDownloadUrl(safeMajor, { runtimePlatform, runtimeArch }),
           destinationPath: tempZipPath,
         });
         await fs.rm(runtimeDir, { recursive: true, force: true });
@@ -2081,8 +2157,10 @@ function createServer({
       items.push({
         major,
         installed: Boolean(installed),
+        installedMajor: installed?.installedMajor || major,
         javaPath: installed?.javaPath || "",
-        runtimeDir: installed?.runtimeDir || getManagedJavaVersionDir(major),
+        runtimeDir: installed?.runtimeDir || (useTermuxJavaManager ? "" : getManagedJavaVersionDir(major)),
+        packageManager: installed?.packageManager || (useTermuxJavaManager ? "termux" : "adoptium"),
       });
     }
     return items;
@@ -3275,8 +3353,10 @@ function createServer({
         const runtime = await ensureManagedJavaRuntime(major);
         installedRuntimes.push({
           major: runtime.major,
+          installedMajor: runtime.installedMajor || runtime.major,
           javaPath: runtime.javaPath,
           runtimeDir: runtime.runtimeDir,
+          packageManager: runtime.packageManager || (useTermuxJavaManager ? "termux" : "adoptium"),
         });
       }
 

@@ -10,9 +10,13 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! command -v java >/dev/null 2>&1; then
-  echo "Java nao encontrado. Instale com: pkg install openjdk-21"
+if ! command -v pkg >/dev/null 2>&1; then
+  echo "Gerenciador pkg nao encontrado. Execute este script dentro do Termux."
   exit 1
+fi
+
+if ! command -v java >/dev/null 2>&1; then
+  echo "Java nao encontrado. O DSM tentara instalar automaticamente pelo Termux quando o servidor iniciar."
 fi
 
 echo "Iniciando DSM no Termux..."

@@ -13,6 +13,10 @@ async function setupApp({
   runtimeManager,
   downloadPaperVersion,
   downloadBinary,
+  commandRunner,
+  runtimePlatform,
+  runtimeArch,
+  runtimeEnv,
   searchPlugins,
   resolvePluginDownload,
   getPluginDetails,
@@ -23,6 +27,10 @@ async function setupApp({
     runtimeManager,
     downloadPaperVersion,
     downloadBinary,
+    commandRunner,
+    runtimePlatform,
+    runtimeArch,
+    runtimeEnv,
     searchPlugins,
     resolvePluginDownload,
     getPluginDetails,
@@ -2179,6 +2187,69 @@ test("api java manager reports and installs required java runtime", async () => 
     const installMissingBody = await installMissingResponse.json();
     assert.equal(installMissingResponse.status, 200);
     assert.equal(installMissingBody.ok, true);
+  } finally {
+    await app.stop();
+  }
+});
+
+test("api java manager installs Java through Termux pkg on Android", async () => {
+  const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "dsm-api-java-termux-"));
+  const serverDir = path.join(dataDir, "server");
+  await fs.mkdir(serverDir, { recursive: true });
+
+  let javaInstalled = false;
+  const commands = [];
+  const commandRunner = async (command, args = []) => {
+    commands.push([command, ...args].join(" "));
+    if (command === "sh" && args.join(" ") === "-c command -v java") {
+      if (!javaInstalled) {
+        const error = new Error("java not found");
+        error.code = 127;
+        throw error;
+      }
+      return { stdout: "/data/data/com.termux/files/usr/bin/java\n", stderr: "" };
+    }
+    if (command === "sh" && args.join(" ") === "-c command -v pkg") {
+      return { stdout: "/data/data/com.termux/files/usr/bin/pkg\n", stderr: "" };
+    }
+    if (command === "pkg" && args.join(" ") === "install -y openjdk-21") {
+      javaInstalled = true;
+      return { stdout: "installed openjdk-21\n", stderr: "" };
+    }
+    if (command === "/data/data/com.termux/files/usr/bin/java" && args.join(" ") === "-version") {
+      return { stdout: "", stderr: 'openjdk version "21.0.7" 2026-04-15\n' };
+    }
+    throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
+  };
+
+  const { app, authHeaders } = await setupApp({
+    dataDir,
+    serverDir,
+    commandRunner,
+    runtimePlatform: "android",
+    runtimeArch: "arm64",
+    runtimeEnv: { PREFIX: "/data/data/com.termux/files/usr" },
+  });
+
+  try {
+    const installResponse = await fetch(`${app.baseUrl}/api/java/manager/install`, {
+      method: "POST",
+      headers: { ...authHeaders({ "content-type": "application/json" }) },
+      body: JSON.stringify({ major: 21 }),
+    });
+    const installBody = await installResponse.json();
+    assert.equal(installResponse.status, 200);
+    assert.equal(installBody.ok, true);
+    assert.equal(installBody.installed[0].javaPath, "/data/data/com.termux/files/usr/bin/java");
+    assert.equal(installBody.installed[0].installedMajor, 21);
+    assert.equal(commands.includes("pkg install -y openjdk-21"), true);
+
+    const statusResponse = await fetch(`${app.baseUrl}/api/java/manager/status`, {
+      headers: authHeaders(),
+    });
+    const statusBody = await statusResponse.json();
+    assert.equal(statusResponse.status, 200);
+    assert.equal(statusBody.installed.find((item) => item.major === 21).packageManager, "termux");
   } finally {
     await app.stop();
   }
