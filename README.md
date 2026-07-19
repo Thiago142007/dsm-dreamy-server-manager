@@ -66,6 +66,21 @@ Abra:
 
 - [http://127.0.0.1:3000](http://127.0.0.1:3000)
 
+## Termux / Android
+
+O DSM tambem pode rodar no Termux em tablets Android ARM64 para hospedar um servidor Paper/Minecraft Java local.
+
+Guia rapido:
+
+```sh
+pkg update && pkg upgrade
+pkg install git nodejs openjdk-21
+npm install
+sh scripts/start-termux.sh
+```
+
+Veja o guia completo em [README-termux.md](README-termux.md).
+
 ## GitHub Codespaces
 
 No Windows, execute:
