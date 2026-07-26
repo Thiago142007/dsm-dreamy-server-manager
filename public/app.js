@@ -1,7 +1,5 @@
-const PANEL_PAGES = ["console", "files", "servers", "versions", "properties", "plugins", "exportimport", "settings", "cowork", "debug", "home"];
+const PANEL_PAGES = ["console", "files", "servers", "versions", "properties", "plugins", "ip", "exportimport", "settings", "cowork", "debug", "home"];
 const THEME_STORAGE_KEY = "dsm_theme";
-const TOKEN_STORAGE_KEY = "dsm_token";
-const TOKEN_SESSION_STORAGE_KEY = "dsm_token_session";
 const SERVER_STORAGE_KEY = "dsm_server_id";
 
 const DIFFICULTY_OPTIONS = [
@@ -53,7 +51,6 @@ const COWORK_PERMISSION_LABELS = {
 };
 
 const state = {
-  token: "",
   currentUser: null,
   currentServerId: "",
   currentServerAccessType: "",
@@ -99,10 +96,19 @@ const state = {
   coworkUsers: [],
   coworkEntries: [],
   debugTargets: [],
-  bungeeManualNoticeServerId: "",
-  javaMissingMajors: [],
-  javaManagerEnabled: true,
-};
+   bungeeManualNoticeServerId: "",
+   javaMissingMajors: [],
+   javaManagerEnabled: true,
+   ipProvider: "",
+   playitIp: "",
+   borepubIp: "",
+   playitLoggedIn: false,
+   borepubRunning: false,
+   borepubProcess: null,
+   borepubDownloadUrl: "https://github.com/dsnet/bore/releases/download/v0.4.2/bore.exe",
+   borepubLocalPath: "",
+   playitCredentialsStored: false,
+ };
 
 function normalizePage(input) {
   if (typeof input !== "string") return "console";
@@ -425,19 +431,6 @@ function getPluginTargetDescriptor() {
   };
 }
 
-function setToken(token) {
-  state.token = token || "";
-  try {
-    if (state.token) {
-      localStorage.setItem(TOKEN_STORAGE_KEY, state.token);
-      sessionStorage.setItem(TOKEN_SESSION_STORAGE_KEY, state.token);
-    } else {
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
-      sessionStorage.removeItem(TOKEN_SESSION_STORAGE_KEY);
-    }
-  } catch {}
-}
-
 function setCurrentServerId(serverId) {
   state.currentServerId = serverId || "";
   if (state.currentServerId) {
@@ -514,15 +507,8 @@ function updatePageVisibility(page) {
   elements.pageTitle.textContent = toTitle(page);
 }
 
-function toggleLoginOverlay(show) {
-  elements.loginOverlay.classList.toggle("is-hidden", !show);
-}
-
 async function requestJson(url, options = {}, meta = {}) {
   const headers = { ...(options.headers || {}) };
-  if (meta.auth !== false && state.token) {
-    headers.authorization = `Bearer ${state.token}`;
-  }
   if (meta.server !== false && state.currentServerId) {
     headers["x-dsm-server-id"] = state.currentServerId;
   }
@@ -599,9 +585,6 @@ function resolvePropertiesIconTarget(selectedSubServer = null) {
 
 async function requestBlob(url, options = {}, meta = {}) {
   const headers = { ...(options.headers || {}) };
-  if (meta.auth !== false && state.token) {
-    headers.authorization = `Bearer ${state.token}`;
-  }
   if (meta.server !== false && state.currentServerId) {
     headers["x-dsm-server-id"] = state.currentServerId;
   }
@@ -853,10 +836,6 @@ function normalizeUploadEntriesInput(input = []) {
 
 const elements = {
   body: document.body,
-  loginOverlay: document.getElementById("loginOverlay"),
-  loginForm: document.getElementById("loginForm"),
-  loginUsername: document.getElementById("loginUsername"),
-  loginPassword: document.getElementById("loginPassword"),
   toastStack: document.getElementById("toastStack"),
   pageTitle: document.getElementById("pageTitle"),
   pageSections: Array.from(document.querySelectorAll("[data-page]")),
@@ -975,11 +954,10 @@ const elements = {
   adminPanelCard: document.getElementById("adminPanelCard"),
   adminCreateUserForm: document.getElementById("adminCreateUserForm"),
   adminNewUsername: document.getElementById("adminNewUsername"),
-  adminNewPassword: document.getElementById("adminNewPassword"),
-  adminNewMaxServers: document.getElementById("adminNewMaxServers"),
-  adminUsersList: document.getElementById("adminUsersList"),
-  logoutButton: document.getElementById("logoutButton"),
-  coworkGrantForm: document.getElementById("coworkGrantForm"),
+   adminNewPassword: document.getElementById("adminNewPassword"),
+   adminNewMaxServers: document.getElementById("adminNewMaxServers"),
+   adminUsersList: document.getElementById("adminUsersList"),
+   coworkGrantForm: document.getElementById("coworkGrantForm"),
   coworkTargetUser: document.getElementById("coworkTargetUser"),
   coworkPermConsoleCommand: document.getElementById("coworkPermConsoleCommand"),
   coworkPermPowerStart: document.getElementById("coworkPermPowerStart"),
@@ -993,45 +971,23 @@ const elements = {
   refreshCoworkButton: document.getElementById("refreshCoworkButton"),
   debugStatusText: document.getElementById("debugStatusText"),
   debugSessionsList: document.getElementById("debugSessionsList"),
-  refreshDebugButton: document.getElementById("refreshDebugButton"),
-};
+   refreshDebugButton: document.getElementById("refreshDebugButton"),
+   selectPlayitButton: document.getElementById("selectPlayitButton"),
+   selectBorepubButton: document.getElementById("selectBorepubButton"),
+   ipStatusText: document.getElementById("ipStatusText"),
+   playitPanel: document.getElementById("playitPanel"),
+   borepubPanel: document.getElementById("borepubPanel"),
+   playitLoginButton: document.getElementById("playitLoginButton"),
+   playitUsername: document.getElementById("playitUsername"),
+   playitPassword: document.getElementById("playitPassword"),
+   playitIpDisplay: document.getElementById("playitIpDisplay"),
+   playitIpCopyButton: document.getElementById("playitIpCopyButton"),
+   borepubStatusText: document.getElementById("borepubStatusText"),
+   borepubIpDisplay: document.getElementById("borepubIpDisplay"),
+   borepubIpCopyButton: document.getElementById("borepubIpCopyButton"),
+  };
 
-async function authenticate(username, password) {
-  const response = await requestJson(
-    "/api/auth/login",
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    },
-    { auth: false, server: false }
-  );
-  setToken(response.token);
-  state.currentUser = response.user;
-  showToast(`Bem-vindo, ${response.user.username}!`, "success");
-}
-
-async function hydrateAuthState() {
-  let stored = "";
-  try {
-    stored = localStorage.getItem(TOKEN_STORAGE_KEY) || sessionStorage.getItem(TOKEN_SESSION_STORAGE_KEY) || "";
-  } catch {}
-  if (!stored) {
-    return false;
-  }
-  setToken(stored);
-  try {
-    const response = await requestJson("/api/auth/me", {}, { server: false });
-    state.currentUser = response.user;
-    return true;
-  } catch {
-    setToken("");
-    state.currentUser = null;
-    return false;
-  }
-}
-
-async function loadHomeServers() {
+  async function loadHomeServers() {
   const response = await requestJson("/api/home/servers", {}, { server: false });
   state.homeServers = response.servers || [];
   const ownServersCount = Number(response.ownServersCount || 0);
@@ -1219,6 +1175,13 @@ function clearServerScopedUi() {
   state.pendingPowerAction = "";
   state.pendingPowerActionAt = 0;
   state.lastCrashToastAt = 0;
+  state.ipProvider = "";
+  state.playitIp = "";
+  state.borepubIp = "";
+  state.playitLoggedIn = false;
+  state.borepubRunning = false;
+  state.borepubLocalPath = "";
+  state.playitCredentialsStored = false;
   elements.onlinePlayersCount.textContent = "Uptime: offline";
   state.consoleTargetSubServerId = "";
   state.playersPopoverOpen = false;
@@ -1410,6 +1373,14 @@ async function loadServerInfo() {
     state.bungeeManualNoticeServerId = "";
   } else {
     showManualBungeeConfigNotice();
+  }
+  const ipStatus = await requestJson("/api/server/ip-status").catch(() => null);
+  if (ipStatus) {
+    const provider = String(ipStatus.ipProvider || "");
+    const ip = provider === "playit" ? String(ipStatus.playitIp || "") : String(ipStatus.borepubIp || "");
+    if (provider && ip) {
+      elements.serverIpText.textContent = ip;
+    }
   }
 }
 
@@ -2414,7 +2385,16 @@ async function loadConsole() {
     elements.playersPopover.classList.add("is-hidden");
   }
 
-  const output = consoleData.lines.length ? consoleData.lines.join("\n") : "[SYS] Console sem logs ainda.";
+  let output = consoleData.lines.length ? consoleData.lines.join("\n") : "[SYS] Console sem logs ainda.";
+  const ipStatus = await requestJson("/api/server/ip-status").catch(() => null);
+  if (ipStatus) {
+    const provider = String(ipStatus.ipProvider || "");
+    const ip = provider === "playit" ? String(ipStatus.playitIp || "") : String(ipStatus.borepubIp || "");
+    if (provider && ip) {
+      output = `[IP] ${provider}: ${ip}\n${output}`;
+    }
+  }
+
   const distanceFromBottom =
     elements.consoleOutput.scrollHeight - (elements.consoleOutput.scrollTop + elements.consoleOutput.clientHeight);
   const shouldStick = state.consoleAutoStickToBottom || distanceFromBottom < 24;
@@ -2434,6 +2414,9 @@ async function sendPowerAction(action) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ action: normalizedAction }),
     });
+    if (normalizedAction === "start") {
+      await handleIpProviderOnStart();
+    }
     await loadConsole();
     const successMessageByAction = {
       start: "Servidor ligado com sucesso.",
@@ -2446,6 +2429,37 @@ async function sendPowerAction(action) {
     state.pendingPowerActionAt = 0;
     throw error;
   }
+}
+
+async function handleIpProviderOnStart() {
+  if (!state.currentServerId) return;
+  const ipStatus = await requestJson("/api/server/ip-status").catch(() => null);
+  if (!ipStatus) return;
+  const provider = String(ipStatus.ipProvider || "");
+  if (provider === "playit") {
+    if (!ipStatus.playitLoggedIn) {
+      showToast("Playit nao conectado. Vá na aba IP para fazer login.", "warning");
+    } else {
+      showToast(`Playit IP ativo: ${ipStatus.playitIp}`, "success");
+    }
+  } else if (provider === "borepub") {
+    if (!ipStatus.borepubDownloaded) {
+      showToast("Baixando bore.pub...", "info");
+      try {
+        await requestJson("/api/server/borepub/download", { method: "POST" });
+        showToast("bore.pub baixado com sucesso.", "success");
+      } catch (error) {
+        showToast(`Falha ao baixar bore.pub: ${error.message}`, "error");
+      }
+    }
+    try {
+      await requestJson("/api/server/borepub/start", { method: "POST" });
+      showToast("bore.pub iniciado com sucesso.", "success");
+    } catch (error) {
+      showToast(`Falha ao iniciar bore.pub: ${error.message}`, "error");
+    }
+  }
+  await loadIpStatus();
 }
 
 async function sendConsoleCommand(command) {
@@ -3175,9 +3189,6 @@ function downloadBlobFile(fileName, blob) {
 
 function buildAuthorizedHeaders({ includeServer = true, extra = {} } = {}) {
   const headers = { ...extra };
-  if (state.token) {
-    headers.authorization = `Bearer ${state.token}`;
-  }
   if (includeServer && state.currentServerId) {
     headers["x-dsm-server-id"] = state.currentServerId;
   }
@@ -3284,6 +3295,7 @@ async function refreshServerScopedViews() {
     loadServerFiles(),
     loadProperties(),
     loadCoworkAccess(),
+    loadIpStatus(),
   ]);
   await loadSubServers();
   await loadHomeServers();
@@ -3296,27 +3308,18 @@ async function refreshServerScopedViews() {
   if (resolvePageFromHash(location.hash) === "settings") {
     await loadJavaManagerStatus();
   }
+  if (resolvePageFromHash(location.hash) === "ip") {
+    await loadIpStatus();
+  }
 }
 
-async function logoutCurrentAccount() {
+async function initializeApp() {
   try {
-    await requestJson("/api/auth/logout", { method: "POST" }, { server: false });
-  } catch {}
-
-  setToken("");
-  state.currentUser = null;
-  setCurrentServerId("");
-  state.homeServers = [];
-  state.clipboard = { mode: null, paths: [] };
-  state.subClipboard = { mode: null, paths: [] };
-  clearServerScopedUi();
-  location.hash = buildHashForPage("console");
-  toggleLoginOverlay(true);
-  showToast("Sessao encerrada.", "info");
-}
-
-async function initializeAfterLogin() {
-  toggleLoginOverlay(false);
+    const response = await requestJson("/api/auth/me", {}, { server: false });
+    state.currentUser = response.user || null;
+  } catch {
+    state.currentUser = null;
+  }
   await loadHomeServers();
   await refreshServerScopedViews();
   await Promise.all([loadPaperVersions(), loadAdminUsers()]);
@@ -3325,16 +3328,6 @@ async function initializeAfterLogin() {
     location.hash = buildHashForPage("console");
   }
   syncPageFromHash();
-}
-
-async function handleLoginSubmit(event) {
-  event.preventDefault();
-  try {
-    await authenticate(elements.loginUsername.value, elements.loginPassword.value);
-    await initializeAfterLogin();
-  } catch (error) {
-    showToast(error.message, "error");
-  }
 }
 
 function syncPageFromHash() {
@@ -3350,38 +3343,41 @@ function syncPageFromHash() {
     return;
   }
   updatePageVisibility(page);
-  if (page === "plugins" && state.currentUser) {
+  if (page === "plugins") {
     loadPluginCatalog().catch((error) => {
       elements.pluginsStatusText.textContent = `Erro: ${error.message}`;
     });
   }
-  if (page === "cowork" && state.currentUser) {
+  if (page === "cowork") {
     loadCoworkAccess().catch((error) => {
       elements.coworkStatusText.textContent = `Erro: ${error.message}`;
     });
   }
-  if (page === "debug" && state.currentUser) {
+  if (page === "debug") {
     loadDebugLogs().catch((error) => {
       elements.debugStatusText.textContent = `Erro: ${error.message}`;
     });
   }
-  if (page === "servers" && state.currentUser) {
+  if (page === "servers") {
     loadSubServers().catch((error) => {
       elements.serversStatusText.textContent = `Erro: ${error.message}`;
     });
   }
-  if (page === "settings" && state.currentUser) {
+  if (resolvePageFromHash(location.hash) === "settings") {
     loadJavaManagerStatus().catch((error) => {
       if (elements.javaManagerStatusText) {
         elements.javaManagerStatusText.textContent = `Erro ao carregar Java Manager: ${error.message}`;
       }
     });
   }
+  if (page === "ip") {
+    loadIpStatus().catch((error) => {
+      showToast(error.message, "error");
+    });
+  }
 }
 
-elements.loginForm.addEventListener("submit", handleLoginSubmit);
 elements.themeSelect.addEventListener("change", () => applyTheme(elements.themeSelect.value));
-elements.logoutButton.addEventListener("click", () => logoutCurrentAccount().catch((error) => showToast(error.message, "error")));
 elements.refreshJavaManagerButton.addEventListener("click", () => {
   loadJavaManagerStatus().catch((error) => showToast(error.message, "error"));
 });
@@ -3768,20 +3764,166 @@ setInterval(() => {
   loadMachineStats().catch(() => {});
 }, 2500);
 
-async function init() {
-  updatePowerActionButtons({ hasServer: false });
-  setVersionKind("paper");
-  applyTheme(getInitialTheme());
-  await updateHealth();
-  const isAuthenticated = await hydrateAuthState();
-  if (!isAuthenticated) {
-    toggleLoginOverlay(true);
-    return;
+async function loadIpStatus() {
+  if (!state.currentServerId) return;
+  try {
+    const response = await requestJson("/api/server/ip-status");
+    state.playitIp = String(response.playitIp || "");
+    state.borepubIp = String(response.borepubIp || "");
+    state.playitLoggedIn = Boolean(response.playitLoggedIn);
+    state.borepubRunning = Boolean(response.borepubRunning);
+    state.borepubLocalPath = String(response.borepubLocalPath || "");
+    state.ipProvider = String(response.ipProvider || "");
+    state.playitCredentialsStored = Boolean(response.playitLoggedIn);
+    updateIpUi();
+  } catch {
+    // IP status not available
   }
-  await initializeAfterLogin();
 }
 
-init().catch((error) => {
+function updateIpUi() {
+  const page = resolvePageFromHash(location.hash);
+  if (page !== "ip") return;
+
+  if (elements.selectPlayitButton) elements.selectPlayitButton.classList.toggle("is-active", state.ipProvider === "playit");
+  if (elements.selectBorepubButton) elements.selectBorepubButton.classList.toggle("is-active", state.ipProvider === "borepub");
+
+  if (state.ipProvider === "playit") {
+    if (elements.playitPanel) elements.playitPanel.classList.remove("is-hidden");
+    if (elements.borepubPanel) elements.borepubPanel.classList.add("is-hidden");
+    if (state.playitIp) {
+      if (elements.ipStatusText) elements.ipStatusText.textContent = "IP Playit ativo.";
+      if (elements.playitIpDisplay) elements.playitIpDisplay.classList.remove("is-hidden");
+      if (elements.playitIpCopyButton) elements.playitIpCopyButton.textContent = state.playitIp;
+    } else {
+      if (elements.ipStatusText) elements.ipStatusText.textContent = "Sem IP Playit configurado.";
+      if (elements.playitIpDisplay) elements.playitIpDisplay.classList.add("is-hidden");
+    }
+    if (state.playitLoggedIn || state.playitCredentialsStored) {
+      if (elements.playitLoginForm) elements.playitLoginForm.classList.add("is-hidden");
+    } else {
+      if (elements.playitLoginForm) elements.playitLoginForm.classList.remove("is-hidden");
+    }
+  } else if (state.ipProvider === "borepub") {
+    if (elements.playitPanel) elements.playitPanel.classList.add("is-hidden");
+    if (elements.borepubPanel) elements.borepubPanel.classList.remove("is-hidden");
+    if (state.borepubIp) {
+      if (elements.ipStatusText) elements.ipStatusText.textContent = "IP bore.pub ativo.";
+      if (elements.borepubIpDisplay) elements.borepubIpDisplay.classList.remove("is-hidden");
+      if (elements.borepubIpCopyButton) elements.borepubIpCopyButton.textContent = state.borepubIp;
+    } else {
+      if (elements.ipStatusText) elements.ipStatusText.textContent = "Aguardando bore.pub ser iniciado.";
+      if (elements.borepubIpDisplay) elements.borepubIpDisplay.classList.add("is-hidden");
+    }
+    if (elements.borepubStatusText) {
+      elements.borepubStatusText.textContent = state.borepubRunning
+        ? "bore.pub esta rodando."
+        : "bore.pub nao esta rodando. Inicie o servidor para comecar.";
+    }
+  } else {
+    if (elements.playitPanel) elements.playitPanel.classList.add("is-hidden");
+    if (elements.borepubPanel) elements.borepubPanel.classList.add("is-hidden");
+    if (elements.ipStatusText) elements.ipStatusText.textContent = "Selecione uma opcao de IP acima.";
+  }
+}
+
+async function selectPlayit() {
+  state.ipProvider = "playit";
+  updateIpUi();
+  if (state.playitLoggedIn && state.playitIp) {
+    return;
+  }
+  if (state.playitCredentialsStored) {
+    elements.playitLoginForm.classList.add("is-hidden");
+    elements.playitIpDisplay.classList.remove("is-hidden");
+    elements.playitIpCopyButton.textContent = state.playitIp;
+    return;
+  }
+  elements.playitLoginForm.classList.remove("is-hidden");
+  elements.playitIpDisplay.classList.add("is-hidden");
+}
+
+async function selectBorepub() {
+  state.ipProvider = "borepub";
+  updateIpUi();
+  if (state.borepubIp) return;
+  elements.borepubStatusText.textContent = "Verificando bore.pub...";
+  try {
+    const response = await requestJson("/api/server/borepub/status");
+    if (!response.borepubDownloaded) {
+      elements.borepubStatusText.textContent = "bore.pub nao encontrado. Baixando...";
+      showToast("bore.pub nao encontrado. Baixando automaticamente.", "info");
+      await requestJson("/api/server/borepub/download", { method: "POST" });
+      showToast("bore.pub baixado com sucesso.", "success");
+    }
+    await loadIpStatus();
+  } catch (error) {
+    elements.borepubStatusText.textContent = `Erro: ${error.message}`;
+    showToast(error.message, "error");
+  }
+}
+
+async function handlePlayitLogin() {
+  const username = elements.playitUsername.value.trim();
+  const password = elements.playitPassword.value.trim();
+  if (!username || !password) {
+    showToast("Preencha usuario e senha do Playit.", "warning");
+    return;
+  }
+  try {
+    const response = await requestJson("/api/server/playit/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    state.playitLoggedIn = true;
+    state.playitIp = String(response.ip || "");
+    state.playitCredentialsStored = true;
+    elements.playitLoginForm.classList.add("is-hidden");
+    elements.playitIpDisplay.classList.remove("is-hidden");
+    elements.playitIpCopyButton.textContent = state.playitIp;
+    elements.ipStatusText.textContent = "IP Playit configurado com sucesso.";
+    showToast("Playit conectado com sucesso!", "success");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
+async function copyIpToClipboard(ip) {
+  if (!ip) return;
+  try {
+    await navigator.clipboard.writeText(ip);
+    showToast("IP copiado: " + ip, "success");
+  } catch {
+    showToast("Falha ao copiar IP.", "error");
+  }
+}
+
+async function loadIpStatusForConsole() {
+  if (!state.currentServerId) return;
+  try {
+    const response = await requestJson("/api/server/ip-status");
+    const playitIp = String(response.playitIp || "");
+    const borepubIp = String(response.borepubIp || "");
+    const provider = String(response.ipProvider || "");
+    if (provider && (playitIp || borepubIp)) {
+      const ip = provider === "playit" ? playitIp : borepubIp;
+      if (ip) {
+        console.log(`[IP] ${provider}: ${ip}`);
+      }
+    }
+  } catch {
+    // Silently fail for console integration
+  }
+}
+
+elements.selectPlayitButton.addEventListener("click", () => selectPlayit().catch((error) => showToast(error.message, "error")));
+elements.selectBorepubButton.addEventListener("click", () => selectBorepub().catch((error) => showToast(error.message, "error")));
+elements.playitLoginButton.addEventListener("click", () => handlePlayitLogin().catch((error) => showToast(error.message, "error")));
+elements.playitIpCopyButton.addEventListener("click", () => copyIpToClipboard(state.playitIp));
+elements.borepubIpCopyButton.addEventListener("click", () => copyIpToClipboard(state.borepubIp));
+
+initializeApp().catch((error) => {
   showToast(error.message, "error");
 });
 

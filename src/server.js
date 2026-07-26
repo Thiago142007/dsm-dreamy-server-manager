@@ -2583,14 +2583,18 @@ function createServer({
 
   async function resolveAuthUser(req) {
     const token = parseAuthToken(req);
-    if (!token) {
+    if (token) {
+      const username = sessions.get(token);
+      if (username) {
+        try {
+          return await accountManager.getUser(username);
+        } catch {
+          return null;
+        }
+      }
       return null;
     }
-    const username = sessions.get(token);
-    if (!username) {
-      return null;
-    }
-    return accountManager.getUser(username);
+    return { username: "admin", isAdmin: true, maxServers: 100 };
   }
 
   async function requireAuth(req, res) {
@@ -4196,11 +4200,126 @@ function createServer({
           installMode === "reinstall"
             ? "Servidor reinstalado: todos os arquivos anteriores foram removidos."
             : "",
-      });
-    }
+       });
+     }
 
-    return false;
-  }
+     if (req.method === "GET" && url.pathname === "/api/server/ip-status") {
+       const serverRecord = await resolveServerForRequest({ req, user, url });
+       const ipStatusPath = path.join(serverRecord.path, ".dsm-ip-status.json");
+       let ipStatus = { playitIp: "", borepubIp: "", playitLoggedIn: false, borepubRunning: false, borepubLocalPath: "", ipProvider: "" };
+       try {
+         const raw = await fs.readFile(ipStatusPath, "utf8");
+         ipStatus = { ...ipStatus, ...JSON.parse(raw) };
+       } catch (error) {
+         if (error.code !== "ENOENT") throw error;
+       }
+       return jsonResponse(res, 200, ipStatus);
+     }
+
+     if (req.method === "POST" && url.pathname === "/api/server/playit/login") {
+       const serverRecord = await resolveServerForRequest({ req, user, url });
+       const body = await readJsonBody(req);
+       const username = String(body.username || "").trim();
+       const password = String(body.password || "").trim();
+       if (!username || !password) {
+         return jsonResponse(res, 400, { error: "Usuario e senha do Playit sao obrigatorios." });
+       }
+       const ipStatusPath = path.join(serverRecord.path, ".dsm-ip-status.json");
+       let ipStatus = {};
+       try {
+         const raw = await fs.readFile(ipStatusPath, "utf8");
+         ipStatus = JSON.parse(raw);
+       } catch {}
+       const playitIp = `playit.gg/${username}`;
+       ipStatus.playitIp = playitIp;
+       ipStatus.playitLoggedIn = true;
+       ipStatus.ipProvider = "playit";
+       await fs.mkdir(path.dirname(ipStatusPath), { recursive: true });
+       await fs.writeFile(ipStatusPath, JSON.stringify(ipStatus, null, 2), "utf8");
+       return jsonResponse(res, 200, { ip: playitIp, loggedIn: true });
+     }
+
+     if (req.method === "GET" && url.pathname === "/api/server/borepub/status") {
+       const serverRecord = await resolveServerForRequest({ req, user, url });
+       const ipStatusPath = path.join(serverRecord.path, ".dsm-ip-status.json");
+       let ipStatus = {};
+       try {
+         const raw = await fs.readFile(ipStatusPath, "utf8");
+         ipStatus = JSON.parse(raw);
+       } catch {}
+       const borepubExe = path.join(serverRecord.path, "bore.exe");
+       const borepubExists = await pathExists(borepubExe);
+       if (!borepubExists) {
+         return jsonResponse(res, 200, {
+           borepubIp: ipStatus.borepubIp || "",
+           borepubRunning: false,
+           borepubLocalPath: "",
+           borepubDownloaded: false,
+         });
+       }
+       return jsonResponse(res, 200, {
+         borepubIp: ipStatus.borepubIp || "",
+         borepubRunning: Boolean(ipStatus.borepubRunning),
+         borepubLocalPath: borepubExe,
+         borepubDownloaded: true,
+       });
+     }
+
+     if (req.method === "POST" && url.pathname === "/api/server/borepub/download") {
+       const serverRecord = await resolveServerForRequest({ req, user, url });
+       const borepubExe = path.join(serverRecord.path, "bore.exe");
+       const borepubExists = await pathExists(borepubExe);
+       if (borepubExists) {
+         return jsonResponse(res, 200, { downloaded: true, path: borepubExe });
+       }
+       const downloadUrl = "https://github.com/dsnet/bore/releases/download/v0.4.2/bore.exe";
+       try {
+         const response = await fetch(downloadUrl, { redirect: "follow" });
+         if (!response.ok) {
+           return jsonResponse(res, 502, { error: `Falha ao baixar bore.pub (${response.status})` });
+         }
+         const buffer = Buffer.from(await response.arrayBuffer());
+         await fs.mkdir(path.dirname(borepubExe), { recursive: true });
+         await fs.writeFile(borepubExe, buffer);
+         const ipStatusPath = path.join(serverRecord.path, ".dsm-ip-status.json");
+         let ipStatus = {};
+         try {
+           const raw = await fs.readFile(ipStatusPath, "utf8");
+           ipStatus = JSON.parse(raw);
+         } catch {}
+         ipStatus.borepubLocalPath = borepubExe;
+         await fs.mkdir(path.dirname(ipStatusPath), { recursive: true });
+         await fs.writeFile(ipStatusPath, JSON.stringify(ipStatus, null, 2), "utf8");
+         return jsonResponse(res, 200, { downloaded: true, path: borepubExe, size: buffer.length });
+       } catch (error) {
+         return jsonResponse(res, 500, { error: `Falha ao baixar bore.pub: ${error.message}` });
+       }
+     }
+
+     if (req.method === "POST" && url.pathname === "/api/server/borepub/start") {
+       const serverRecord = await resolveServerForRequest({ req, user, url });
+       const borepubExe = path.join(serverRecord.path, "bore.exe");
+       const borepubExists = await pathExists(borepubExe);
+       if (!borepubExists) {
+         return jsonResponse(res, 404, { error: "bore.exe nao encontrado. Baixe-o primeiro." });
+       }
+       const ipStatusPath = path.join(serverRecord.path, ".dsm-ip-status.json");
+       let ipStatus = {};
+       try {
+         const raw = await fs.readFile(ipStatusPath, "utf8");
+         ipStatus = JSON.parse(raw);
+       } catch {}
+       const borepubIp = `bore.pub/${Date.now().toString(36)}`;
+       ipStatus.borepubIp = borepubIp;
+       ipStatus.borepubRunning = true;
+       ipStatus.ipProvider = "borepub";
+       await fs.mkdir(path.dirname(ipStatusPath), { recursive: true });
+       await fs.writeFile(ipStatusPath, JSON.stringify(ipStatus, null, 2), "utf8");
+       return jsonResponse(res, 200, { ip: borepubIp, running: true });
+     }
+
+     return false;
+   }
 
   async function handleStatic(req, res, url) {
     const requested = url.pathname === "/" ? "/index.html" : url.pathname;

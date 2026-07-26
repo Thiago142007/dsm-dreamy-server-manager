@@ -1,0 +1,53 @@
+services:
+  # Serviço Frontend/Backend do DSM
+  dsm-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev  # Usar stage 'dev' para desenvolvimento com hot reload
+    container_name: dsm-app
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - HOST=0.0.0.0
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      # Bind mounts para hot reload em desenvolvimento
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./scripts:/app/scripts
+      # Volumes nomeados para dados persistentes
+      - dsm-data:/app/data
+      - dsm-logs:/app/logs
+      - dsm-backups:/app/backups
+      - dsm-config:/app/config
+      - dsm-server:/app/server
+    networks:
+      - dsm-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# Volumes nomeados para dados persistentes
+volumes:
+  dsm-data:
+    driver: local
+  dsm-logs:
+    driver: local
+  dsm-backups:
+    driver: local
+  dsm-config:
+    driver: local
+  dsm-server:
+    driver: local
+
+# Rede compartilhada entre containers
+networks:
+  dsm-network:
+    driver: bridge

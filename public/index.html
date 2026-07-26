@@ -7,21 +7,6 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body class="dsm-shell" data-theme="green">
-    <div id="loginOverlay" class="login-overlay">
-      <form id="loginForm" class="login-card">
-        <h2>Entrar no DSM</h2>
-        <label>
-          Usuario
-          <input id="loginUsername" required />
-        </label>
-        <label>
-          Senha
-          <input id="loginPassword" type="password" required />
-        </label>
-        <button type="submit">Entrar</button>
-      </form>
-    </div>
-
     <aside class="sidebar">
       <div class="brand">
         <strong>DSM</strong>
@@ -34,6 +19,7 @@
         <a href="#/versions" data-page-link="versions" class="nav-link">Versions</a>
         <a href="#/properties" data-page-link="properties" class="nav-link">Properties</a>
         <a href="#/plugins" data-page-link="plugins" class="nav-link">Plugins</a>
+        <a href="#/ip" data-page-link="ip" class="nav-link">IP</a>
         <a href="#/exportimport" id="exportImportNavLink" data-page-link="exportimport" class="nav-link">Export/import</a>
         <a href="#/settings" data-page-link="settings" class="nav-link">Settings</a>
         <a href="#/cowork" data-page-link="cowork" class="nav-link">Cowork</a>
@@ -278,6 +264,42 @@
           </div>
           <p id="propertiesStatusText" class="muted-text">Alteracoes salvam automaticamente.</p>
           <div id="propertiesTable" class="properties-table"></div>
+        </article>
+      </section>
+
+      <section id="page-ip" data-page="ip" class="page-section is-hidden">
+        <article class="panel-card">
+          <h2>Escolher IP</h2>
+          <p class="muted-text">Selecione a opcao de IP para acessar o servidor.</p>
+          <div class="ip-options">
+            <button id="selectPlayitButton" type="button" class="ip-option-button">Playit</button>
+            <button id="selectBorepubButton" type="button" class="ip-option-button">bore.pub</button>
+          </div>
+          <div id="ipStatusText" class="muted-text">Selecione uma opcao de IP acima.</div>
+        </article>
+
+        <article id="playitPanel" class="panel-card is-hidden">
+          <h2>Playit</h2>
+          <p class="muted-text">Conecte sua conta Playit para obter o IP do servidor.</p>
+          <div id="playitLoginForm" class="inline-form">
+            <input id="playitUsername" placeholder="Usuario Playit" />
+            <input id="playitPassword" type="password" placeholder="Senha Playit" />
+            <button id="playitLoginButton" type="button">Entrar</button>
+          </div>
+          <div id="playitIpDisplay" class="is-hidden">
+            <p class="muted-text">IP do servidor:</p>
+            <button id="playitIpCopyButton" type="button" class="ip-copy-button"></button>
+          </div>
+        </article>
+
+        <article id="borepubPanel" class="panel-card is-hidden">
+          <h2>bore.pub</h2>
+          <p class="muted-text">O bore.pub sera baixado e iniciado automaticamente ao ligar o servidor.</p>
+          <div id="borepubStatusText" class="muted-text">Aguardando selecionar o servidor.</div>
+          <div id="borepubIpDisplay" class="is-hidden">
+            <p class="muted-text">IP do servidor:</p>
+            <button id="borepubIpCopyButton" type="button" class="ip-copy-button"></button>
+          </div>
         </article>
       </section>
 

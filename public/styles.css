@@ -422,10 +422,63 @@ button:disabled {
   box-shadow: 0 8px 16px color-mix(in srgb, var(--accent) 26%, transparent);
 }
 
+.ip-options {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0.7rem;
+}
+
+.ip-option-button {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--bg-card) 84%, var(--accent) 16%), var(--bg-card));
+  color: var(--text-main);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 130ms ease, filter 130ms ease, box-shadow 130ms ease, border-color 130ms ease;
+}
+
+.ip-option-button:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 14px color-mix(in srgb, var(--accent) 24%, transparent);
+  border-color: var(--line-strong);
+}
+
+.ip-option-button.is-active {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 70%, #fff 30%), var(--accent));
+  color: #041109;
+  border-color: var(--line-strong);
+}
+
+.ip-copy-button {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 90%, #fff 10%), var(--accent));
+  color: #041109;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  word-break: break-all;
+  text-align: left;
+  font-family: "Consolas", "Cascadia Mono", monospace;
+  transition: transform 130ms ease, filter 130ms ease, box-shadow 130ms ease;
+}
+
+.ip-copy-button:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 14px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
 .inline-form {
   display: grid;
   gap: 0.6rem;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr 1fr auto;
   margin-top: 0.75rem;
 }
 

@@ -1,0 +1,222 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    ✓ DREAMY SERVER MANAGER - DOCKER SETUP CONCLUÍDO
+═══════════════════════════════════════════════════════════════════════════════
+
+📦 CONTAINERS CRIADOS
+─────────────────────────────────────────────────────────────────────────────
+
+  Container:  dsm-app
+  Imagem:     dreamyservermanager-dsm-app:latest
+  Status:     ✓ UP (healthy)
+  Tamanho:    2.55 GB
+  Criado:     agora
+
+
+🌐 PORTAS UTILIZADAS
+─────────────────────────────────────────────────────────────────────────────
+
+  Aplicação (DSM):           0.0.0.0:3000 → localhost:3000
+  Minecraft Server (opcional): 25565
+  BungeeCord (opcional):       25577
+
+
+💾 VOLUMES CRIADOS (Dados Persistentes)
+─────────────────────────────────────────────────────────────────────────────
+
+  dreamyservermanager_dsm-data       → Contas, servidores, dados da aplicação
+  dreamyservermanager_dsm-logs       → Logs da aplicação
+  dreamyservermanager_dsm-backups    → Backups exportados
+  dreamyservermanager_dsm-config     → Configurações
+  dreamyservermanager_dsm-server     → Diretório do servidor Minecraft
+
+
+🔗 REDE DOCKER
+─────────────────────────────────────────────────────────────────────────────
+
+  Nome:    dreamyservermanager_dsm-network
+  Driver:  bridge
+  Escopo:  local
+
+
+🚀 ACESSAR O PAINEL
+─────────────────────────────────────────────────────────────────────────────
+
+  URL: http://localhost:3000
+
+  Credenciais Padrão:
+    Usuário: admin
+    Senha:   85113005
+
+  IMPORTANTE: Mude a senha após o primeiro login em um ambiente de produção!
+
+
+📊 ARQUIVOS DOCKER CRIADOS
+─────────────────────────────────────────────────────────────────────────────
+
+  ✓ Dockerfile                   → Imagem multi-stage (dev + production)
+  ✓ docker-compose.yml           → Configuração dos serviços
+  ✓ .dockerignore                → Arquivos ignorados no build
+  ✓ .env                         → Variáveis de ambiente (criado)
+  ✓ .env.example                 → Template de variáveis
+  ✓ DOCKER.md                    → Documentação completa
+
+
+📝 SCRIPTS DOCKER CRIADOS
+─────────────────────────────────────────────────────────────────────────────
+
+  scripts/docker-start.sh        → Iniciar ambiente
+  scripts/docker-stop.sh         → Parar containers
+  scripts/docker-rebuild.sh      → Reconstruir imagem
+  scripts/docker-logs.sh         → Visualizar logs
+  scripts/docker-export.sh       → Exportar dados (backup)
+  scripts/docker-backup-volume.sh → Backup do volume Docker
+  scripts/docker-test.sh         → Executar testes
+
+
+⚙️  CONFIGURAÇÃO PADRÃO (.env)
+─────────────────────────────────────────────────────────────────────────────
+
+  APP_PORT=3000
+  LOG_LEVEL=info
+  NODE_ENV=development
+  HOST=0.0.0.0
+  ADMIN_USERNAME=admin
+  ADMIN_PASSWORD=85113005
+  MAX_SERVERS_PER_USER=5
+
+
+💡 COMANDOS ÚTEIS
+─────────────────────────────────────────────────────────────────────────────
+
+  Ver status dos containers:
+    docker compose ps
+
+  Ver logs em tempo real:
+    docker compose logs -f dsm-app
+
+  Parar ambiente (mantém dados):
+    docker compose stop
+
+  Remover containers (mantém volumes):
+    docker compose down
+
+  Remover tudo (APAGA TUDO!):
+    docker compose down -v
+
+  Reconstruir imagem:
+    docker compose build --no-cache
+
+  Executar testes:
+    docker compose exec -T dsm-app npm test
+
+  Entrar no container (shell):
+    docker compose exec -it dsm-app sh
+
+
+🔥 HOT RELOAD (DESENVOLVIMENTO)
+─────────────────────────────────────────────────────────────────────────────
+
+  ✓ Ativado automaticamente para:
+    - ./src       → Código-fonte
+    - ./public    → Frontend
+
+  Edite os arquivos e as alterações serão refletidas automaticamente.
+  Se não funcionar, execute: docker compose restart dsm-app
+
+
+📦 VOLUME MAPPING (Desenvolvimento)
+─────────────────────────────────────────────────────────────────────────────
+
+  ./src        → /app/src       (Código-fonte)
+  ./public     → /app/public    (Frontend)
+  ./scripts    → /app/scripts   (Scripts)
+  Volumes ↔ /app/data, /app/logs, /app/backups, /app/config, /app/server
+
+
+🛡️  SEGURANÇA
+─────────────────────────────────────────────────────────────────────────────
+
+  ✓ Containers executam com usuário não-root (dsm:1001)
+  ✓ Health checks configurados (intervalo 30s)
+  ✓ Isolation de rede (rede Docker interna)
+  ✓ Volumes isolados por container
+
+
+🎯 PRÓXIMOS PASSOS
+─────────────────────────────────────────────────────────────────────────────
+
+  1. Abra http://localhost:3000 no navegador
+
+  2. Faça login com admin / 85113005
+
+  3. Crie sua conta e configure o painel
+
+  4. (Opcional) Mude a senha do admin em Configurações
+
+  5. (Opcional) Configure um servidor Minecraft
+
+  6. (Opcional) Instale extensões
+
+  7. Para desenvolvimento:
+     - Edite arquivos em ./src e ./public
+     - Mudanças serão refletidas automaticamente (hot reload)
+
+  8. Para parar:
+     - docker compose down
+
+  9. Para reiniciar:
+     - docker compose up -d
+
+  10. Para documentação completa:
+     - Leia DOCKER.md
+
+
+📚 DOCUMENTAÇÃO
+─────────────────────────────────────────────────────────────────────────────
+
+  README.md          → Documentação do DSM
+  DOCKER.md          → Guia completo do Docker
+  README-termux.md   → Guia para Termux/Android
+
+
+❓ SOLUCIONAR PROBLEMAS
+─────────────────────────────────────────────────────────────────────────────
+
+  Porta 3000 em uso?
+    Altere APP_PORT em .env, ex: APP_PORT=3001
+    Acesse: http://localhost:3001
+
+  Container não inicia?
+    docker compose logs dsm-app
+
+  Limpar cache Docker?
+    docker system prune -a
+
+  Perder dados ao remover containers?
+    NÃO! Volumes Docker preservam dados.
+    Use: docker compose down -v   (APENAS se quiser deletar)
+
+  Restaurar de um backup?
+    Consulte a seção de backups em DOCKER.md
+
+
+✅ VERIFICAÇÃO FINAL
+─────────────────────────────────────────────────────────────────────────────
+
+  [✓] Imagem Docker construída
+  [✓] Container iniciado e saudável
+  [✓] Porta 3000 mapeada
+  [✓] Volumes criados
+  [✓] Rede Docker criada
+  [✓] Hot reload configurado
+  [✓] Documentação criada
+  [✓] Scripts de utilidade criados
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Status: ✓ PRONTO PARA USO
+
+Acesse: http://localhost:3000
+
+═══════════════════════════════════════════════════════════════════════════════
