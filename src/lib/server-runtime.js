@@ -1,9 +1,20 @@
 const { spawn } = require("node:child_process");
 const path = require("node:path");
 
-function createDefaultSpawner({ serverDir, jarFileName = "paper.jar", javaExecutable = "java" }) {
+function createDefaultSpawner({ serverDir, jarFileName = "paper.jar", javaExecutable = "java", memoryArgs = [] }) {
+  const args = [];
+  if (Array.isArray(memoryArgs)) {
+    for (const arg of memoryArgs) {
+      const value = String(arg || "").trim();
+      if (value) {
+        args.push(value);
+      }
+    }
+  }
+  args.push("-jar", jarFileName, "nogui");
+
   return () =>
-    spawn(javaExecutable, ["-jar", jarFileName, "nogui"], {
+    spawn(javaExecutable, args, {
       cwd: serverDir,
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -57,12 +68,15 @@ function createServerRuntime({
   serverDir = path.resolve(process.cwd(), "server"),
   javaExecutable = "java",
   maxConsoleLines = 400,
+  memoryArgs = [],
   onLine,
 } = {}) {
   let proc = null;
   let startedAt = 0;
   const lines = [];
-  const spawnFn = spawnProcess || createDefaultSpawner({ serverDir, javaExecutable });
+  const spawnFn =
+    spawnProcess ||
+    createDefaultSpawner({ serverDir, javaExecutable, memoryArgs });
 
   function pushLines(chunk, stream = "OUT") {
     for (const line of splitLines(chunk)) {

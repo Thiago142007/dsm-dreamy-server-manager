@@ -6,7 +6,7 @@
     <title>DSM - Dreamy Server Manager</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body class="dsm-shell" data-theme="green">
+  <body class="dsm-shell" data-theme="light">
     <aside class="sidebar">
       <div class="brand">
         <strong>DSM</strong>
@@ -262,6 +262,14 @@
               <select id="propertiesSubServerSelect"></select>
             </label>
           </div>
+          <div id="propertiesMemoryWrap" class="properties-toolbar">
+            <label>
+              Memoria (GB)
+              <input id="propertiesMemoryInput" type="number" min="1" step="1" />
+            </label>
+            <button id="propertiesMemorySaveButton" type="button" class="button-small">Salvar memoria</button>
+            <p id="propertiesMemoryStatusText" class="muted-text">Servidor principal: 4 GB</p>
+          </div>
           <p id="propertiesStatusText" class="muted-text">Alteracoes salvam automaticamente.</p>
           <div id="propertiesTable" class="properties-table"></div>
         </article>
@@ -397,9 +405,9 @@
           <label>
             Tema
             <select id="themeSelect">
-              <option value="green">Green</option>
-              <option value="dark">Dark</option>
-              <option value="light">Light</option>
+              <option value="green">Verde</option>
+              <option value="dark">Escuro</option>
+              <option value="light" selected>Cinza claro</option>
             </select>
           </label>
         </article>

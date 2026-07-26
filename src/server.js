@@ -652,6 +652,13 @@ function toSafeSlug(value) {
     .replace(/^-+|-+$/g, "");
 }
 
+function resolveMemoryArgs(meta = {}, fallbackGb = 4) {
+  const raw = Number(meta.maxMemoryGb || meta.memoryGb || fallbackGb);
+  const safeMax = Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : fallbackGb;
+  const minGb = Math.max(1, Math.floor(safeMax * 0.25));
+  return [`-Xms${minGb}G`, `-Xmx${safeMax}G`];
+}
+
 function normalizeBungeeMeta(meta) {
   const source = meta && typeof meta === "object" ? meta : {};
   const bungee = source.bungee && typeof source.bungee === "object" ? source.bungee : {};
@@ -664,6 +671,7 @@ function normalizeBungeeMeta(meta) {
           slug: String(item.slug || "").trim(),
           path: String(item.path || "").trim(),
           port: Number(item.port || 0),
+          memoryGb: Number(item.memoryGb || 0),
           version: String(item.version || "").trim(),
           createdAt: String(item.createdAt || ""),
         }))
@@ -676,6 +684,7 @@ function normalizeBungeeMeta(meta) {
   return {
     ...source,
     serverKind: String(source.serverKind || "paper").toLowerCase() === "bungeecord" ? "bungeecord" : "paper",
+    maxMemoryGb: Number(source.maxMemoryGb || 4),
     bungee: {
       nextPort,
       subServers,
@@ -1068,6 +1077,7 @@ async function discoverBungeeSubServersFromDirectory(serverDir) {
       slug,
       path: absoluteDir,
       port,
+      memoryGb: 0,
       version,
       createdAt: new Date().toISOString(),
     });
@@ -1120,6 +1130,7 @@ async function ensureImportedServerConfiguration(serverDir, archiveServer = {}) 
     await patchServerMeta(serverDir, {
       serverKind: "bungeecord",
       paperVersion: String(normalizedMeta.paperVersion || archivePaperVersion || "bungeecord"),
+      maxMemoryGb: 4,
       bungee: {
         nextPort: getNextAvailableSubServerPort(subServers, 25566),
         subServers,
@@ -1132,6 +1143,7 @@ async function ensureImportedServerConfiguration(serverDir, archiveServer = {}) 
   await patchServerMeta(serverDir, {
     serverKind: "paper",
     paperVersion: String(normalizedMeta.paperVersion || archivePaperVersion || ""),
+    maxMemoryGb: 4,
     bungee: {
       nextPort: 25566,
       subServers: [],
@@ -2198,10 +2210,11 @@ function createServer({
     };
   }
 
-  function createMainServerRuntime(serverRecord, javaExecutable = "java") {
+  function createMainServerRuntime(serverRecord, javaExecutable = "java", memoryArgs = []) {
     return createServerRuntime({
       serverDir: serverRecord.path,
       javaExecutable,
+      memoryArgs,
       onLine: ({ stream, line, formatted }) => {
         parsePlayerEvents(serverRecord.id, line);
         captureRuntimeDebugLine({
@@ -2243,7 +2256,7 @@ function createServer({
       };
     }
 
-    runtimeState.runtime = createMainServerRuntime(serverRecord, javaRuntime.javaPath);
+    runtimeState.runtime = createMainServerRuntime(serverRecord, javaRuntime.javaPath, resolveMemoryArgs(meta));
     syncRuntimeCursorToTail(runtimeState.runtime);
     runtimeState.mainJavaMajor = requiredMajor;
     runtimeState.mainJavaPath = javaRuntime.javaPath;
@@ -2274,7 +2287,9 @@ function createServer({
       typeof runtimeManager === "function"
         ? runtimeManager({ serverRecord, serverRole: "main", subServer: null })
         : runtimeManager;
-    const mainRuntime = runtime || createMainServerRuntime(serverRecord);
+    const mainRuntime =
+      runtime ||
+      createMainServerRuntime(serverRecord, "java", resolveMemoryArgs({}));
 
     state = {
       runtime: mainRuntime,
@@ -2291,7 +2306,7 @@ function createServer({
     return state;
   }
 
-  function createSubServerRuntime(serverRecord, subServer, { javaExecutable = "java" } = {}) {
+  function createSubServerRuntime(serverRecord, subServer, { javaExecutable = "java", memoryArgs = [] } = {}) {
     const customRuntime =
       typeof runtimeManager === "function"
         ? runtimeManager({ serverRecord, serverRole: "subserver", subServer })
@@ -2302,6 +2317,7 @@ function createServer({
     return createServerRuntime({
       serverDir: subServer.path,
       javaExecutable,
+      memoryArgs,
       onLine: ({ stream, line, formatted }) => {
         captureRuntimeDebugLine({
           serverRecord,
@@ -2492,7 +2508,11 @@ function createServer({
       javaPath = javaRuntime.javaPath;
     }
 
-    const runtime = createSubServerRuntime(serverRecord, { ...subServer, path: absoluteSubPath }, { javaExecutable: javaPath });
+    const runtime = createSubServerRuntime(
+      serverRecord,
+      { ...subServer, path: absoluteSubPath },
+      { javaExecutable: javaPath, memoryArgs: resolveMemoryArgs(subServer) }
+    );
     runtimeState.subRuntimeById.set(subServer.id, {
       runtime,
       path: absoluteSubPath,
@@ -3222,7 +3242,7 @@ function createServer({
       return jsonResponse(res, 201, created);
     }
 
-    if (req.method === "GET" && url.pathname === "/api/system/stats") {
+    async function buildSystemStatsResponse(req, res, user) {
       const serverRecord = await resolveServerForRequest({ req, user, url });
       const meta = await readNormalizedServerMeta(serverRecord.path);
       const memoryTotalBytes = os.totalmem();
@@ -3272,6 +3292,15 @@ function createServer({
       });
     }
 
+    if (req.method === "GET" && url.pathname === "/api/system/stats") {
+      try {
+        return await buildSystemStatsResponse(req, res, user);
+      } catch (error) {
+        console.error("stats error", error);
+        return jsonResponse(res, 500, { error: error?.message || "stats failed" });
+      }
+    }
+
     if (req.method === "GET" && url.pathname === "/api/server/status") {
       const serverRecord = await resolveServerForRequest({ req, user, url });
       const runtimeState = getOrCreateRuntimeState(serverRecord);
@@ -3301,11 +3330,24 @@ function createServer({
         paperVersion: typeof meta.paperVersion === "string" ? meta.paperVersion : "",
         updatedAt: typeof meta.updatedAt === "string" ? meta.updatedAt : null,
         serverKind: meta.serverKind || "paper",
+        maxMemoryGb: Number(meta.maxMemoryGb || 4),
         bungeeSubServerCount: Array.isArray(meta.bungee?.subServers) ? meta.bungee.subServers.length : 0,
         serverIp,
         serverPort,
         serverAddress: `${serverIp}:${serverPort}`,
       });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/server/memory") {
+      const serverRecord = await resolveServerForRequest({ req, user, body, url });
+      if (!requireServerPermission(res, serverRecord, "filesUpload")) return true;
+      const body = await readJsonBody(req);
+      const maxMemoryGb = Number(body.maxMemoryGb);
+      if (!Number.isFinite(maxMemoryGb) || maxMemoryGb < 1) {
+        return jsonResponse(res, 400, { error: "maxMemoryGb must be a number >= 1" });
+      }
+      const next = await patchServerMeta(serverRecord.path, { maxMemoryGb });
+      return jsonResponse(res, 200, { maxMemoryGb: next.maxMemoryGb });
     }
 
     if (req.method === "GET" && url.pathname === "/api/java/manager/status") {
@@ -3687,6 +3729,7 @@ function createServer({
           slug: item.slug,
           version: item.version || "",
           port: item.port,
+          memoryGb: item.memoryGb || 0,
           createdAt: item.createdAt || "",
         })),
       });
@@ -3748,6 +3791,7 @@ function createServer({
         slug,
         path: subServerPath,
         port: nextPort,
+        memoryGb: 0,
         version,
         createdAt: new Date().toISOString(),
       };
@@ -3820,6 +3864,40 @@ function createServer({
         deletedSubServerId: subServerId,
         deletedSubServerName: targetSubServer.name,
       });
+    }
+
+    if (req.method === "POST" && url.pathname.startsWith("/api/server/subservers/") && url.pathname.endsWith("/memory")) {
+      const subServerId = decodeURIComponent(url.pathname.replace("/api/server/subservers/", "").replace("/memory", "")).trim();
+      if (!subServerId) {
+        return jsonResponse(res, 400, { error: "Sub-server id is required" });
+      }
+      const serverRecord = await resolveServerForRequest({ req, user, body, url });
+      if (!requireServerPermission(res, serverRecord, "filesUpload")) return true;
+      const body = await readJsonBody(req);
+      const memoryGb = Number(body.memoryGb);
+      if (!Number.isFinite(memoryGb) || memoryGb < 1) {
+        return jsonResponse(res, 400, { error: "memoryGb must be a number >= 1" });
+      }
+      const meta = await readNormalizedServerMeta(serverRecord.path);
+      if (meta.serverKind !== "bungeecord") {
+        return jsonResponse(res, 400, { error: "Current server is not bungeecord" });
+      }
+      const currentSubServers = Array.isArray(meta.bungee?.subServers) ? meta.bungee.subServers : [];
+      const targetIndex = currentSubServers.findIndex((item) => item.id === subServerId);
+      if (targetIndex < 0) {
+        return jsonResponse(res, 404, { error: "Sub-server not found" });
+      }
+      const nextSubServers = currentSubServers.map((item, index) =>
+        index === targetIndex ? { ...item, memoryGb } : item
+      );
+      await patchServerMeta(serverRecord.path, {
+        serverKind: "bungeecord",
+        bungee: {
+          ...meta.bungee,
+          subServers: nextSubServers,
+        },
+      });
+      return jsonResponse(res, 200, { memoryGb });
     }
 
     if (req.method === "GET" && url.pathname === "/api/server/subservers/files") {

@@ -32,15 +32,15 @@ body[data-theme="dark"] {
 }
 
 body[data-theme="light"] {
-  --bg-main: #f0f3f5;
-  --bg-sidebar: #e3e8ec;
+  --bg-main: #f0f2f5;
+  --bg-sidebar: #e4e7ec;
   --bg-card: #ffffff;
-  --bg-card-soft: #f8fbfd;
-  --line: rgba(25, 32, 42, 0.13);
-  --line-strong: rgba(25, 32, 42, 0.28);
-  --accent: #1a8a52;
-  --accent-soft: rgba(26, 138, 82, 0.12);
-  --text-main: #151b22;
+  --bg-card-soft: #f6f8fa;
+  --line: rgba(16, 20, 24, 0.12);
+  --line-strong: rgba(16, 20, 24, 0.25);
+  --accent: #5a6c7a;
+  --accent-soft: rgba(90, 108, 122, 0.14);
+  --text-main: #14181c;
   --text-soft: #4d5b6b;
   --text-muted: #6e7987;
   --danger: #b13e3e;
@@ -345,8 +345,14 @@ button {
   transition: transform 130ms ease, filter 130ms ease, box-shadow 130ms ease;
 }
 
+.button-small {
+  font-size: 0.82rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 8px;
+}
+
 body[data-theme="light"] button {
-  color: #f7fff9;
+  color: #ffffff;
 }
 
 button:hover {

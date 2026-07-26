@@ -927,6 +927,10 @@ const elements = {
   propertiesServerIconStatusText: document.getElementById("propertiesServerIconStatusText"),
   propertiesSubServerWrap: document.getElementById("propertiesSubServerWrap"),
   propertiesSubServerSelect: document.getElementById("propertiesSubServerSelect"),
+  propertiesMemoryWrap: document.getElementById("propertiesMemoryWrap"),
+  propertiesMemoryInput: document.getElementById("propertiesMemoryInput"),
+  propertiesMemorySaveButton: document.getElementById("propertiesMemorySaveButton"),
+  propertiesMemoryStatusText: document.getElementById("propertiesMemoryStatusText"),
   pluginSearchForm: document.getElementById("pluginSearchForm"),
   pluginSourceSelect: document.getElementById("pluginSourceSelect"),
   pluginSortSelect: document.getElementById("pluginSortSelect"),
@@ -3174,7 +3178,33 @@ async function loadProperties() {
   } else {
     elements.propertiesStatusText.textContent = "Alteracoes salvam automaticamente.";
   }
+
+  await loadMemoryConfig(selectedSubServer);
 }
+
+async function loadMemoryConfig(selectedSubServer = null) {
+  if (!state.currentServerId || !elements.propertiesMemoryInput) return;
+  try {
+    if (selectedSubServer) {
+      const memoryGb = Number(selectedSubServer.memoryGb || 0);
+      elements.propertiesMemoryInput.value = memoryGb > 0 ? memoryGb : "";
+      elements.propertiesMemoryStatusText.textContent = `${selectedSubServer.name}: ${memoryGb > 0 ? memoryGb + " GB" : "Padrao (4 GB)"}`;
+      elements.propertiesMemorySaveButton.disabled = false;
+      elements.propertiesMemorySaveButton.textContent = "Salvar memoria";
+    } else {
+      const info = await requestJson("/api/server/info").catch(() => ({}));
+      const memoryGb = Number(info.maxMemoryGb || 4);
+      elements.propertiesMemoryInput.value = memoryGb;
+      elements.propertiesMemoryStatusText.textContent = `Servidor principal: ${memoryGb} GB`;
+      elements.propertiesMemorySaveButton.disabled = false;
+      elements.propertiesMemorySaveButton.textContent = "Salvar memoria";
+    }
+  } catch {
+    elements.propertiesMemoryInput.value = "";
+    elements.propertiesMemoryStatusText.textContent = "Erro ao carregar configuracao de memoria.";
+  }
+}
+
 
 function downloadBlobFile(fileName, blob) {
   const anchor = document.createElement("a");
@@ -3463,6 +3493,36 @@ elements.propertiesSubServerSelect.addEventListener("change", () => {
     elements.propertiesStatusText.textContent = `Erro ao carregar: ${error.message}`;
   });
 });
+elements.propertiesMemorySaveButton.addEventListener("click", async () => {
+  if (!elements.propertiesMemoryInput.value || !state.currentServerId) return;
+  const memoryGb = Number(elements.propertiesMemoryInput.value);
+  if (!Number.isFinite(memoryGb) || memoryGb < 1) {
+    showToast("RAM invalida. Use um numero >= 1.", "error");
+    return;
+  }
+  const selectedSubServer = getSelectedPropertiesSubServer();
+  try {
+    if (selectedSubServer) {
+      await requestJson(`/api/server/subservers/${encodeURIComponent(selectedSubServer.id)}/memory`, {
+        method: "POST",
+        body: { memoryGb },
+      });
+      selectedSubServer.memoryGb = memoryGb;
+      elements.propertiesMemoryStatusText.textContent = `${selectedSubServer.name}: ${memoryGb} GB`;
+      showToast(`Memoria do sub-servidor atualizada para ${memoryGb} GB.`, "success");
+    } else {
+      await requestJson("/api/server/memory", {
+        method: "POST",
+        body: { maxMemoryGb: memoryGb },
+      });
+      elements.propertiesMemoryStatusText.textContent = `Servidor principal: ${memoryGb} GB`;
+      showToast(`Memoria do servidor atualizada para ${memoryGb} GB.`, "success");
+    }
+  } catch (error) {
+    showToast(`Erro ao salvar memoria: ${error.message}`, "error");
+  }
+});
+
 elements.consoleTargetSelect.addEventListener("change", () => {
   const selectedValue = String(elements.consoleTargetSelect.value || "main").trim();
   state.consoleTargetSubServerId = selectedValue === "main" ? "" : selectedValue;
