@@ -1,28 +1,25 @@
 const path = require("node:path");
+const fs = require("node:fs/promises");
 const { app, BrowserWindow, dialog, shell } = require("electron");
 const { createServer } = require("../src/server");
+const { resolveStorageRoot } = require("./portable-paths");
 
 let mainWindow = null;
 let dsmServer = null;
 let isShuttingDown = false;
 
-function getStorageRoot() {
-  if (app.isPackaged) {
-    return app.getPath("userData");
-  }
-  return process.cwd();
-}
-
 async function startBackend() {
   if (dsmServer) {
     return dsmServer;
   }
-  const storageRoot = getStorageRoot();
+
+  const storageRoot = resolveStorageRoot({ isPackaged: app.isPackaged });
+  await fs.mkdir(storageRoot, { recursive: true });
   dsmServer = createServer({
     dataDir: path.join(storageRoot, "data"),
     serverDir: path.join(storageRoot, "server"),
   });
-  await dsmServer.start(3000);
+  await dsmServer.start(0, "127.0.0.1");
   return dsmServer;
 }
 
@@ -71,16 +68,24 @@ function registerCrashHandlers() {
   });
 }
 
-app.whenReady().then(async () => {
+async function startDesktop() {
   registerCrashHandlers();
-  await createMainWindow();
+  try {
+    await createMainWindow();
+  } catch (error) {
+    const message = error?.stack || error?.message || String(error);
+    dialog.showErrorBox("Falha ao iniciar DSM", message);
+    app.exit(1);
+  }
 
   app.on("activate", async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       await createMainWindow();
     }
   });
-});
+}
+
+app.whenReady().then(startDesktop);
 
 app.on("before-quit", (event) => {
   if (isShuttingDown) {

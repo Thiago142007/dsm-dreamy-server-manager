@@ -8,8 +8,7 @@
 - Sidebar estilo Pterodactyl com paginas: `Console`, `Files`, `Versions`, `Properties`, `Extensions`, `Settings`
 - Sidebar com pagina extra `Home` (selecao de servidor ativo)
 - Animacoes e efeitos visuais (transicoes de pagina, hover glow e fundo animado)
-- Login com usuario/senha e sessao
-- Conta admin padrao: `admin` / `85113005`
+- Conta admin padrao: `admin` / `85113005` (o painel web abre sem login quando usado localmente)
 - Registro de extensoes
 - Controle de servidor na aba `Console`:
 - botoes `Ligar`, `Desligar`, `Reiniciar`
@@ -53,6 +52,7 @@
 - `src/lib/placeholders.js`: render de placeholders
 - `src/lib/server-runtime.js`: controle de processo do servidor Minecraft
 - `src/lib/paper-versions.js`: catalogo de versoes Paper
+- `electron/portable-paths.js`: resolver de caminho para desktop portatil
 - `public/*`: frontend do painel
 - `tests/*`: testes em `node:test`
 
@@ -65,6 +65,22 @@ node src/server.js
 Abra:
 
 - [http://127.0.0.1:3000](http://127.0.0.1:3000)
+
+## Desktop Electron
+
+Para abrir em modo de desenvolvimento:
+
+```powershell
+npm run desktop
+```
+
+Para gerar o executavel portatil de Windows x64:
+
+```powershell
+npm run dist:win
+```
+
+O arquivo final fica em `dist-electron/Dreamy Server Manager.exe`. Ao abrir, o DSM cria `Dreamy Server Manager Data` ao lado do executavel para guardar contas, configuracoes, servidores e Java gerenciado. Mova o `.exe` e essa pasta juntos para preservar os dados.
 
 ## Termux / Android
 
