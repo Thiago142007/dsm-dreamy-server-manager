@@ -20,6 +20,14 @@ function createDefaultSpawner({ serverDir, jarFileName = "paper.jar", javaExecut
     });
 }
 
+function createBedrockSpawner({ serverDir, binaryName = "bedrock_server" }) {
+  return () =>
+    spawn(binaryName, [], {
+      cwd: serverDir,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+}
+
 const ANSI_ESCAPE_PATTERN = /\u001b\[[0-?]*[ -/]*[@-~]/g;
 const ANSI_OSC_PATTERN = /\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g;
 const CONTROL_CHARS_PATTERN = /[\u0000-\u0008\u000b-\u001a\u001c-\u001f\u007f]/g;
@@ -70,13 +78,17 @@ function createServerRuntime({
   maxConsoleLines = 400,
   memoryArgs = [],
   onLine,
+  serverKind = "paper",
 } = {}) {
   let proc = null;
   let startedAt = 0;
   const lines = [];
+  const isBedrock = serverKind === "bedrock";
   const spawnFn =
     spawnProcess ||
-    createDefaultSpawner({ serverDir, javaExecutable, memoryArgs });
+    (isBedrock
+      ? createBedrockSpawner({ serverDir })
+      : createDefaultSpawner({ serverDir, javaExecutable, memoryArgs }));
 
   function pushLines(chunk, stream = "OUT") {
     for (const line of splitLines(chunk)) {

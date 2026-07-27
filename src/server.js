@@ -18,7 +18,7 @@ const {
   resolveJavaMajorForPaperVersion,
   resolveJavaMajorForServer,
 } = require("./lib/java-manager");
-const { listPaperVersions, getPaperVersionUrl } = require("./lib/paper-versions");
+const { listPaperVersions, getPaperVersionUrl, listBedrockVersions, getBedrockVersionUrl } = require("./lib/paper-versions");
 const { createAccountManager, COWORK_PERMISSION_KEYS } = require("./lib/account-manager");
 const {
   searchPlugins: defaultSearchPlugins,
@@ -231,6 +231,7 @@ async function streamServerArchiveJson({ res, serverDir, serverName, serverKind 
 function normalizeImportedServerKind(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (normalized === "bungeecord") return "bungeecord";
+  if (normalized === "bedrock") return "bedrock";
   if (normalized === "paper") return "paper";
   return "";
 }
@@ -681,9 +682,14 @@ function normalizeBungeeMeta(meta) {
   const nextPortCandidate = Number(bungee.nextPort || 0);
   const nextPort = getNextAvailableSubServerPort(subServers, 25566, nextPortCandidate);
 
+  const rawServerKind = String(source.serverKind || "paper").toLowerCase();
+  let serverKind = "paper";
+  if (rawServerKind === "bungeecord") serverKind = "bungeecord";
+  if (rawServerKind === "bedrock") serverKind = "bedrock";
+
   return {
     ...source,
-    serverKind: String(source.serverKind || "paper").toLowerCase() === "bungeecord" ? "bungeecord" : "paper",
+    serverKind,
     maxMemoryGb: Number(source.maxMemoryGb || 4),
     bungee: {
       nextPort,
@@ -1113,6 +1119,16 @@ async function detectImportedServerKind(serverDir, archiveServer = {}) {
     }
   }
 
+  const bedrockManifest = path.join(serverDir, "bedrock_server");
+  if (await pathExists(bedrockManifest)) {
+    return "bedrock";
+  }
+
+  const bedrockExe = path.join(serverDir, "bedrock_server.exe");
+  if (await pathExists(bedrockExe)) {
+    return "bedrock";
+  }
+
   return "paper";
 }
 
@@ -1140,6 +1156,19 @@ async function ensureImportedServerConfiguration(serverDir, archiveServer = {}) 
     return "bungeecord";
   }
 
+  if (serverKind === "bedrock") {
+    await patchServerMeta(serverDir, {
+      serverKind: "bedrock",
+      paperVersion: String(normalizedMeta.paperVersion || archivePaperVersion || ""),
+      maxMemoryGb: 4,
+      bungee: {
+        nextPort: 25566,
+        subServers: [],
+      },
+    });
+    return "bedrock";
+  }
+
   await patchServerMeta(serverDir, {
     serverKind: "paper",
     paperVersion: String(normalizedMeta.paperVersion || archivePaperVersion || ""),
@@ -1159,7 +1188,10 @@ async function ensureEulaAccepted(serverDir) {
 }
 
 function normalizeServerType(value) {
-  return String(value || "").trim().toLowerCase() === "bungeecord" ? "bungeecord" : "paper";
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "bungeecord") return "bungeecord";
+  if (normalized === "bedrock") return "bedrock";
+  return "paper";
 }
 
 function toSafeSlug(value) {
@@ -2178,93 +2210,103 @@ function createServer({
     return items;
   }
 
-  function getJavaRequirementsFromMeta(meta) {
-    const normalizedMeta = meta && typeof meta === "object" ? meta : {};
-    const main = {
-      serverKind: String(normalizedMeta.serverKind || "paper"),
-      paperVersion: String(normalizedMeta.paperVersion || ""),
-      requiredJavaMajor: resolveJavaMajorForServer({
-        serverKind: normalizedMeta.serverKind || "paper",
-        paperVersion: normalizedMeta.paperVersion || "",
-      }),
-    };
+function getJavaRequirementsFromMeta(meta) {
+  const normalizedMeta = meta && typeof meta === "object" ? meta : {};
+  const serverKind = String(normalizedMeta.serverKind || "paper").toLowerCase();
+  const paperVersion = String(normalizedMeta.paperVersion || "").trim();
+  const main = {
+    serverKind,
+    paperVersion,
+    requiredJavaMajor: resolveJavaMajorForServer({
+      serverKind,
+      paperVersion,
+    }),
+  };
 
-    const subServers = Array.isArray(normalizedMeta.bungee?.subServers)
-      ? normalizedMeta.bungee.subServers.map((sub) => ({
-          id: String(sub.id || ""),
-          name: String(sub.name || ""),
-          version: String(sub.version || ""),
-          requiredJavaMajor: resolveJavaMajorForPaperVersion(sub.version || ""),
-        }))
-      : [];
+  const subServers = serverKind === "bungeecord" && Array.isArray(normalizedMeta.bungee?.subServers)
+    ? normalizedMeta.bungee.subServers.map((sub) => ({
+        id: String(sub.id || ""),
+        name: String(sub.name || ""),
+        version: String(sub.version || ""),
+        requiredJavaMajor: resolveJavaMajorForPaperVersion(sub.version || ""),
+      }))
+    : [];
 
-    const requiredMajors = new Set([main.requiredJavaMajor]);
-    for (const sub of subServers) {
-      requiredMajors.add(sub.requiredJavaMajor);
-    }
-
-    return {
-      main,
-      subServers,
-      requiredMajors: Array.from(requiredMajors).sort((a, b) => a - b),
-    };
+  const requiredMajors = new Set([main.requiredJavaMajor]);
+  for (const sub of subServers) {
+    requiredMajors.add(sub.requiredJavaMajor);
   }
 
-  function createMainServerRuntime(serverRecord, javaExecutable = "java", memoryArgs = []) {
-    return createServerRuntime({
-      serverDir: serverRecord.path,
-      javaExecutable,
-      memoryArgs,
-      onLine: ({ stream, line, formatted }) => {
-        parsePlayerEvents(serverRecord.id, line);
-        captureRuntimeDebugLine({
-          serverRecord,
-          targetType: "main",
-          stream,
-          line,
-          formatted,
-        });
-      },
-    });
+  return {
+    main,
+    subServers,
+    requiredMajors: Array.from(requiredMajors).filter((major) => major > 0).sort((a, b) => a - b),
+  };
+}
+
+function createMainServerRuntime(serverRecord, javaExecutable = "java", memoryArgs = [], serverKind = "paper") {
+  return createServerRuntime({
+    serverDir: serverRecord.path,
+    javaExecutable,
+    memoryArgs,
+    serverKind,
+    onLine: ({ stream, line, formatted }) => {
+      parsePlayerEvents(serverRecord.id, line);
+      captureRuntimeDebugLine({
+        serverRecord,
+        targetType: "main",
+        stream,
+        line,
+        formatted,
+      });
+    },
+  });
+}
+
+async function ensureMainRuntimeJava({ serverRecord, runtimeState, meta }) {
+  const serverKind = String(meta?.serverKind || "paper").toLowerCase();
+  if (serverKind === "bedrock") {
+    return null;
+  }
+  if (!useManagedJavaRuntimes || !runtimeState?.runtime?.__dsmDefaultRuntime) {
+    return null;
   }
 
-  async function ensureMainRuntimeJava({ serverRecord, runtimeState, meta }) {
-    if (!useManagedJavaRuntimes || !runtimeState?.runtime?.__dsmDefaultRuntime) {
-      return null;
-    }
+  const requiredMajor = resolveJavaMajorForServer({
+    serverKind,
+    paperVersion: meta?.paperVersion || "",
+  });
+  if (requiredMajor === 0) {
+    return null;
+  }
+  const javaRuntime = await ensureManagedJavaRuntime(requiredMajor);
+  const shouldReplaceRuntime =
+    runtimeState.mainJavaMajor !== requiredMajor || runtimeState.mainJavaPath !== javaRuntime.javaPath;
 
-    const requiredMajor = resolveJavaMajorForServer({
-      serverKind: meta?.serverKind || "paper",
-      paperVersion: meta?.paperVersion || "",
-    });
-    const javaRuntime = await ensureManagedJavaRuntime(requiredMajor);
-    const shouldReplaceRuntime =
-      runtimeState.mainJavaMajor !== requiredMajor || runtimeState.mainJavaPath !== javaRuntime.javaPath;
-
-    if (!shouldReplaceRuntime) {
-      return {
-        requiredMajor,
-        javaPath: javaRuntime.javaPath,
-      };
-    }
-
-    const status = runtimeState.runtime.getStatus?.();
-    if (status?.state === "running") {
-      return {
-        requiredMajor,
-        javaPath: runtimeState.mainJavaPath || javaRuntime.javaPath,
-      };
-    }
-
-    runtimeState.runtime = createMainServerRuntime(serverRecord, javaRuntime.javaPath, resolveMemoryArgs(meta));
-    syncRuntimeCursorToTail(runtimeState.runtime);
-    runtimeState.mainJavaMajor = requiredMajor;
-    runtimeState.mainJavaPath = javaRuntime.javaPath;
+  if (!shouldReplaceRuntime) {
     return {
       requiredMajor,
       javaPath: javaRuntime.javaPath,
     };
   }
+
+  const status = runtimeState.runtime.getStatus?.();
+  if (status?.state === "running") {
+    return {
+      requiredMajor,
+      javaPath: runtimeState.mainJavaPath || javaRuntime.javaPath,
+    };
+  }
+
+  runtimeState.runtime = createMainServerRuntime(serverRecord, javaRuntime.javaPath, resolveMemoryArgs(meta), serverKind);
+  syncRuntimeCursorToTail(runtimeState.runtime);
+  runtimeState.mainJavaMajor = requiredMajor;
+  runtimeState.mainJavaPath = javaRuntime.javaPath;
+  return {
+    requiredMajor,
+    javaPath: javaRuntime.javaPath,
+  };
+}
 
   function getOrCreateRuntimeState(serverRecord) {
     const mainDescriptor = getDebugTargetDescriptor({ serverRecord, targetType: "main" });
@@ -2283,13 +2325,15 @@ function createServer({
       return state;
     }
 
+    const meta = readNormalizedServerMeta(serverRecord.path);
+    const serverKind = String(meta.serverKind || "paper").toLowerCase();
     const runtime =
       typeof runtimeManager === "function"
         ? runtimeManager({ serverRecord, serverRole: "main", subServer: null })
         : runtimeManager;
     const mainRuntime =
       runtime ||
-      createMainServerRuntime(serverRecord, "java", resolveMemoryArgs({}));
+      createMainServerRuntime(serverRecord, "java", resolveMemoryArgs({}), serverKind);
 
     state = {
       runtime: mainRuntime,
@@ -2306,30 +2350,31 @@ function createServer({
     return state;
   }
 
-  function createSubServerRuntime(serverRecord, subServer, { javaExecutable = "java", memoryArgs = [] } = {}) {
-    const customRuntime =
-      typeof runtimeManager === "function"
-        ? runtimeManager({ serverRecord, serverRole: "subserver", subServer })
-        : null;
-    if (customRuntime) {
-      return customRuntime;
-    }
-    return createServerRuntime({
-      serverDir: subServer.path,
-      javaExecutable,
-      memoryArgs,
-      onLine: ({ stream, line, formatted }) => {
-        captureRuntimeDebugLine({
-          serverRecord,
-          targetType: "subserver",
-          subServer,
-          stream,
-          line,
-          formatted,
-        });
-      },
-    });
+function createSubServerRuntime(serverRecord, subServer, { javaExecutable = "java", memoryArgs = [], serverKind = "paper" } = {}) {
+  const customRuntime =
+    typeof runtimeManager === "function"
+      ? runtimeManager({ serverRecord, serverRole: "subserver", subServer })
+      : null;
+  if (customRuntime) {
+    return customRuntime;
   }
+  return createServerRuntime({
+    serverDir: subServer.path,
+    javaExecutable,
+    memoryArgs,
+    serverKind,
+    onLine: ({ stream, line, formatted }) => {
+      captureRuntimeDebugLine({
+        serverRecord,
+        targetType: "subserver",
+        subServer,
+        stream,
+        line,
+        formatted,
+      });
+    },
+  });
+}
 
   async function stopRuntime(runtime) {
     if (!runtime || typeof runtime.stop !== "function") return;
@@ -2472,7 +2517,7 @@ function createServer({
     }
   }
 
-  async function getOrCreateSubRuntime({ serverRecord, runtimeState, subServer, requiredJavaMajor = 17 }) {
+  async function getOrCreateSubRuntime({ serverRecord, runtimeState, subServer, requiredJavaMajor = 17, serverKind = "paper" }) {
     if (!runtimeState.subRuntimeById) {
       runtimeState.subRuntimeById = new Map();
     }
@@ -2503,7 +2548,7 @@ function createServer({
     }
 
     let javaPath = "java";
-    if (useManagedJavaRuntimes) {
+    if (useManagedJavaRuntimes && serverKind !== "bedrock") {
       const javaRuntime = await ensureManagedJavaRuntime(requiredJavaMajor);
       javaPath = javaRuntime.javaPath;
     }
@@ -2511,7 +2556,7 @@ function createServer({
     const runtime = createSubServerRuntime(
       serverRecord,
       { ...subServer, path: absoluteSubPath },
-      { javaExecutable: javaPath, memoryArgs: resolveMemoryArgs(subServer) }
+      { javaExecutable: javaPath, memoryArgs: resolveMemoryArgs(subServer), serverKind }
     );
     runtimeState.subRuntimeById.set(subServer.id, {
       runtime,
@@ -2548,6 +2593,7 @@ function createServer({
           runtimeState,
           subServer: { ...subServer, path: absoluteSubPath },
           requiredJavaMajor,
+          serverKind: meta.serverKind,
         });
         const subDescriptor = getDebugTargetDescriptor({
           serverRecord,
@@ -2891,6 +2937,7 @@ function createServer({
       runtimeState,
       subServer,
       requiredJavaMajor: resolveJavaMajorForPaperVersion(subServer.version || ""),
+      serverKind: meta.serverKind,
     });
     return {
       runtime,
@@ -4169,117 +4216,170 @@ function createServer({
       });
     }
 
-    if (req.method === "GET" && url.pathname === "/api/paper/versions") {
-      return jsonResponse(res, 200, { items: listPaperVersions() });
+if (req.method === "GET" && url.pathname === "/api/paper/versions") {
+  return jsonResponse(res, 200, { items: listPaperVersions() });
+}
+
+if (req.method === "GET" && url.pathname === "/api/bedrock/versions") {
+  return jsonResponse(res, 200, { items: listBedrockVersions() });
+}
+
+if (req.method === "POST" && url.pathname === "/api/paper/download") {
+  const body = await readJsonBody(req);
+  const serverRecord = await resolveServerForRequest({ req, user, body, url });
+  if (!requireServerPermission(res, serverRecord, "filesUpload")) return true;
+  const targetKind = String(body.serverKind || "paper").trim().toLowerCase();
+  const version = String(body.version || "").trim();
+  const requestedInstallMode = String(body.installMode || "").trim().toLowerCase();
+  const installMode = requestedInstallMode || "";
+  if (installMode && !["replace_jar", "reinstall"].includes(installMode)) {
+    return jsonResponse(res, 400, { error: "Invalid install mode" });
+  }
+  const currentMeta = await readNormalizedServerMeta(serverRecord.path);
+  const currentVersion = String(currentMeta.paperVersion || "").trim();
+  if (targetKind === "paper" && currentVersion && currentVersion !== version && !installMode) {
+    return jsonResponse(res, 409, {
+      error: "Version already installed",
+      actionRequired: "version_change",
+      currentVersion,
+      requestedVersion: version,
+      options: ["replace_jar", "reinstall"],
+      warning:
+        "Reinstalar o servidor inteiro remove todos os arquivos atuais.",
+    });
+  }
+
+  if (installMode === "reinstall") {
+    const runtimeState = runtimeStateByServerId.get(serverRecord.id);
+    if (runtimeState?.runtime && typeof runtimeState.runtime.stop === "function") {
+      const mainDescriptor = getDebugTargetDescriptor({ serverRecord, targetType: "main" });
+      harvestRuntimeDebugErrors({
+        ...mainDescriptor,
+        runtime: runtimeState.runtime,
+      });
+      try {
+        await runtimeState.runtime.stop();
+      } catch {}
+      harvestRuntimeDebugErrors({
+        ...mainDescriptor,
+        runtime: runtimeState.runtime,
+      });
+      markDebugSessionStopped(mainDescriptor);
     }
+    await stopAllSubRuntimes(runtimeState, serverRecord);
+    if (runtimeState) {
+      runtimeState.processCpuSnapshot = null;
+    }
+    playersByServerId.set(serverRecord.id, new Set());
+    await fs.mkdir(serverRecord.path, { recursive: true });
+    await wipeDirectoryContents(serverRecord.path);
+  }
 
-    if (req.method === "POST" && url.pathname === "/api/paper/download") {
-      const body = await readJsonBody(req);
-      const serverRecord = await resolveServerForRequest({ req, user, body, url });
-      if (!requireServerPermission(res, serverRecord, "filesUpload")) return true;
-      const targetKind = String(body.serverKind || "paper").trim().toLowerCase() === "bungeecord" ? "bungeecord" : "paper";
-      const version = String(body.version || "").trim();
-      const requestedInstallMode = String(body.installMode || "").trim().toLowerCase();
-      const installMode = requestedInstallMode || "";
-      if (installMode && !["replace_jar", "reinstall"].includes(installMode)) {
-        return jsonResponse(res, 400, { error: "Invalid install mode" });
-      }
-      const currentMeta = await readNormalizedServerMeta(serverRecord.path);
-      const currentVersion = String(currentMeta.paperVersion || "").trim();
-      if (targetKind === "paper" && currentVersion && currentVersion !== version && !installMode) {
-        return jsonResponse(res, 409, {
-          error: "Version already installed",
-          actionRequired: "version_change",
-          currentVersion,
-          requestedVersion: version,
-          options: ["replace_jar", "reinstall"],
-          warning:
-            "Reinstalar o servidor inteiro remove todos os arquivos atuais.",
-        });
-      }
+  if (targetKind === "bedrock") {
+    const fileName = "bedrock_server.zip";
+    const destinationPath = path.join(serverRecord.path, fileName);
+    const urlValue = getBedrockVersionUrl(version);
+    if (!urlValue) {
+      return jsonResponse(res, 404, { error: "Bedrock version not found" });
+    }
+    const meta = await downloadBinary({
+      url: urlValue,
+      destinationPath,
+    });
+    await patchServerMeta(serverRecord.path, {
+      serverKind: "bedrock",
+      paperVersion: version,
+      paperJar: fileName,
+      installMode: installMode || "replace_jar",
+      bungee: {
+        nextPort: 25566,
+        subServers: [],
+      },
+    });
+    await ensureEulaAccepted(serverRecord.path);
+    return jsonResponse(res, 200, {
+      ok: true,
+      version,
+      serverKind: "bedrock",
+      fileName,
+      bytesWritten: meta.bytesWritten || 0,
+      installModeApplied: installMode || "replace_jar",
+      warning: "",
+    });
+  }
 
-      if (installMode === "reinstall") {
-        const runtimeState = runtimeStateByServerId.get(serverRecord.id);
-        if (runtimeState?.runtime && typeof runtimeState.runtime.stop === "function") {
-          const mainDescriptor = getDebugTargetDescriptor({ serverRecord, targetType: "main" });
-          harvestRuntimeDebugErrors({
-            ...mainDescriptor,
-            runtime: runtimeState.runtime,
-          });
-          try {
-            await runtimeState.runtime.stop();
-          } catch {}
-          harvestRuntimeDebugErrors({
-            ...mainDescriptor,
-            runtime: runtimeState.runtime,
-          });
-          markDebugSessionStopped(mainDescriptor);
-        }
-        await stopAllSubRuntimes(runtimeState, serverRecord);
-        if (runtimeState) {
-          runtimeState.processCpuSnapshot = null;
-        }
-        playersByServerId.set(serverRecord.id, new Set());
-        await fs.mkdir(serverRecord.path, { recursive: true });
-        await wipeDirectoryContents(serverRecord.path);
-      }
+  if (targetKind === "bungeecord") {
+    const fileName = "paper.jar";
+    const destinationPath = path.join(serverRecord.path, fileName);
+    let meta;
+    let installedVersion = version;
+    meta = await downloadBinary({
+      url: BUNGEECORD_JAR_URL,
+      destinationPath,
+    });
+    installedVersion = "bungeecord";
+    await patchServerMeta(serverRecord.path, {
+      serverKind: "bungeecord",
+      paperVersion: installedVersion,
+      paperJar: fileName,
+      installMode: installMode || "replace_jar",
+      bungee: {
+        nextPort: 25566,
+        subServers: [],
+      },
+    });
+    return jsonResponse(res, 200, {
+      ok: true,
+      version: installedVersion,
+      serverKind: targetKind,
+      fileName,
+      bytesWritten: meta.bytesWritten || 0,
+      installModeApplied: installMode || "replace_jar",
+      warning:
+        installMode === "reinstall"
+          ? "Servidor reinstalado: todos os arquivos anteriores foram removidos."
+          : "",
+    });
+  }
 
-      const fileName = "paper.jar";
-      const destinationPath = path.join(serverRecord.path, fileName);
-      let meta;
-      let installedVersion = version;
-      if (targetKind === "bungeecord") {
-        meta = await downloadBinary({
-          url: BUNGEECORD_JAR_URL,
-          destinationPath,
-        });
-        installedVersion = "bungeecord";
-        await patchServerMeta(serverRecord.path, {
-          serverKind: "bungeecord",
-          paperVersion: installedVersion,
-          paperJar: fileName,
-          installMode: installMode || "replace_jar",
-          bungee: {
-            nextPort: 25566,
-            subServers: [],
-          },
-        });
-      } else {
-        const urlValue = getPaperVersionUrl(version);
-        if (!urlValue) {
-          return jsonResponse(res, 404, { error: "Version not found" });
-        }
-        meta = await downloadPaperVersion({
-          version,
-          url: urlValue,
-          fileName,
-          destinationPath,
-        });
-        await patchServerMeta(serverRecord.path, {
-          serverKind: "paper",
-          paperVersion: version,
-          paperJar: fileName,
-          installMode: installMode || "replace_jar",
-          bungee: {
-            nextPort: 25566,
-            subServers: [],
-          },
-        });
-        await ensureEulaAccepted(serverRecord.path);
-      }
-      return jsonResponse(res, 200, {
-        ok: true,
-        version: installedVersion,
-        serverKind: targetKind,
-        fileName,
-        bytesWritten: meta.bytesWritten || 0,
-        installModeApplied: installMode || "replace_jar",
-        warning:
-          installMode === "reinstall"
-            ? "Servidor reinstalado: todos os arquivos anteriores foram removidos."
-            : "",
-       });
-     }
+  const fileName = "paper.jar";
+  const destinationPath = path.join(serverRecord.path, fileName);
+  let meta;
+  let installedVersion = version;
+  const urlValue = getPaperVersionUrl(version);
+  if (!urlValue) {
+    return jsonResponse(res, 404, { error: "Version not found" });
+  }
+  meta = await downloadPaperVersion({
+    version,
+    url: urlValue,
+    fileName,
+    destinationPath,
+  });
+  await patchServerMeta(serverRecord.path, {
+    serverKind: "paper",
+    paperVersion: version,
+    paperJar: fileName,
+    installMode: installMode || "replace_jar",
+    bungee: {
+      nextPort: 25566,
+      subServers: [],
+    },
+  });
+  await ensureEulaAccepted(serverRecord.path);
+  return jsonResponse(res, 200, {
+    ok: true,
+    version: installedVersion,
+    serverKind: targetKind,
+    fileName,
+    bytesWritten: meta.bytesWritten || 0,
+    installModeApplied: installMode || "replace_jar",
+    warning:
+      installMode === "reinstall"
+        ? "Servidor reinstalado: todos os arquivos anteriores foram removidos."
+        : "",
+  });
+}
 
      if (req.method === "GET" && url.pathname === "/api/server/ip-status") {
        const serverRecord = await resolveServerForRequest({ req, user, url });
@@ -4294,28 +4394,54 @@ function createServer({
        return jsonResponse(res, 200, ipStatus);
      }
 
-     if (req.method === "POST" && url.pathname === "/api/server/playit/login") {
-       const serverRecord = await resolveServerForRequest({ req, user, url });
-       const body = await readJsonBody(req);
-       const username = String(body.username || "").trim();
-       const password = String(body.password || "").trim();
-       if (!username || !password) {
-         return jsonResponse(res, 400, { error: "Usuario e senha do Playit sao obrigatorios." });
-       }
-       const ipStatusPath = path.join(serverRecord.path, ".dsm-ip-status.json");
-       let ipStatus = {};
-       try {
-         const raw = await fs.readFile(ipStatusPath, "utf8");
-         ipStatus = JSON.parse(raw);
-       } catch {}
-       const playitIp = `playit.gg/${username}`;
-       ipStatus.playitIp = playitIp;
-       ipStatus.playitLoggedIn = true;
-       ipStatus.ipProvider = "playit";
-       await fs.mkdir(path.dirname(ipStatusPath), { recursive: true });
-       await fs.writeFile(ipStatusPath, JSON.stringify(ipStatus, null, 2), "utf8");
-       return jsonResponse(res, 200, { ip: playitIp, loggedIn: true });
-     }
+if (req.method === "POST" && url.pathname === "/api/server/playit/login") {
+        const serverRecord = await resolveServerForRequest({ req, user, url });
+        const body = await readJsonBody(req);
+        const secretKey = String(body.secretKey || "").trim();
+        if (!secretKey) {
+          return jsonResponse(res, 400, { error: "A chave secreta do Playit e obrigatoria." });
+        }
+        let playitIp = "";
+        try {
+          const apiResponse = await fetch("https://api.playit.gg/me", {
+            headers: { Authorization: `Bearer ${secretKey}` },
+          });
+          if (!apiResponse.ok) {
+            return jsonResponse(res, 401, { error: "Chave secreta do Playit invalida." });
+          }
+          const accountData = await apiResponse.json();
+          const tunnelsResponse = await fetch("https://api.playit.gg/tunnels", {
+            headers: { Authorization: `Bearer ${secretKey}` },
+          });
+          if (tunnelsResponse.ok) {
+            const tunnelsData = await tunnelsResponse.json();
+            const tunnel = tunnelsData.data?.[0];
+            if (tunnel?.attributes?.domain) {
+              playitIp = tunnel.attributes.domain;
+            }
+          }
+          if (!playitIp && accountData.data?.attributes?.username) {
+            playitIp = `${accountData.data.attributes.username}.playit.gg`;
+          }
+        } catch {
+          return jsonResponse(res, 502, { error: "Falha ao conectar com a API do Playit." });
+        }
+        if (!playitIp) {
+          return jsonResponse(res, 400, { error: "Nenhum IP de tunnel encontrado. Verifique sua chave secreta e crie um tunnel no painel do Playit." });
+        }
+        const ipStatusPath = path.join(serverRecord.path, ".dsm-ip-status.json");
+        let ipStatus = {};
+        try {
+          const raw = await fs.readFile(ipStatusPath, "utf8");
+          ipStatus = JSON.parse(raw);
+        } catch {}
+        ipStatus.playitIp = playitIp;
+        ipStatus.playitLoggedIn = true;
+        ipStatus.ipProvider = "playit";
+        await fs.mkdir(path.dirname(ipStatusPath), { recursive: true });
+        await fs.writeFile(ipStatusPath, JSON.stringify(ipStatus, null, 2), "utf8");
+        return jsonResponse(res, 200, { ip: playitIp, loggedIn: true });
+      }
 
      if (req.method === "GET" && url.pathname === "/api/server/borepub/status") {
        const serverRecord = await resolveServerForRequest({ req, user, url });
@@ -4343,36 +4469,59 @@ function createServer({
        });
      }
 
-     if (req.method === "POST" && url.pathname === "/api/server/borepub/download") {
-       const serverRecord = await resolveServerForRequest({ req, user, url });
-       const borepubExe = path.join(serverRecord.path, "bore.exe");
-       const borepubExists = await pathExists(borepubExe);
-       if (borepubExists) {
-         return jsonResponse(res, 200, { downloaded: true, path: borepubExe });
-       }
-       const downloadUrl = "https://github.com/dsnet/bore/releases/download/v0.4.2/bore.exe";
-       try {
-         const response = await fetch(downloadUrl, { redirect: "follow" });
-         if (!response.ok) {
-           return jsonResponse(res, 502, { error: `Falha ao baixar bore.pub (${response.status})` });
-         }
-         const buffer = Buffer.from(await response.arrayBuffer());
-         await fs.mkdir(path.dirname(borepubExe), { recursive: true });
-         await fs.writeFile(borepubExe, buffer);
-         const ipStatusPath = path.join(serverRecord.path, ".dsm-ip-status.json");
-         let ipStatus = {};
-         try {
-           const raw = await fs.readFile(ipStatusPath, "utf8");
-           ipStatus = JSON.parse(raw);
-         } catch {}
-         ipStatus.borepubLocalPath = borepubExe;
-         await fs.mkdir(path.dirname(ipStatusPath), { recursive: true });
-         await fs.writeFile(ipStatusPath, JSON.stringify(ipStatus, null, 2), "utf8");
-         return jsonResponse(res, 200, { downloaded: true, path: borepubExe, size: buffer.length });
-       } catch (error) {
-         return jsonResponse(res, 500, { error: `Falha ao baixar bore.pub: ${error.message}` });
-       }
-     }
+      if (req.method === "POST" && url.pathname === "/api/server/borepub/download") {
+        const serverRecord = await resolveServerForRequest({ req, user, url });
+        const borepubExe = path.join(serverRecord.path, "bore.exe");
+        const borepubExists = await pathExists(borepubExe);
+        if (borepubExists) {
+          return jsonResponse(res, 200, { downloaded: true, path: borepubExe });
+        }
+        const downloadUrl = "https://github.com/ekzhang/bore/releases/download/v0.6.0/bore-v0.6.0-x86_64-pc-windows-msvc.zip";
+        try {
+          const response = await fetch(downloadUrl, { redirect: "follow" });
+          if (!response.ok) {
+            return jsonResponse(res, 502, { error: `Falha ao baixar bore.pub (${response.status})` });
+          }
+          const buffer = Buffer.from(await response.arrayBuffer());
+          const zipDir = path.join(serverRecord.path, "bore-temp-extract");
+          await fs.mkdir(zipDir, { recursive: true });
+          await unzipper.Extract({ path: zipDir }).end(buffer);
+          const extractedExe = path.join(zipDir, "bore.exe");
+          const extractedExists = await pathExists(extractedExe);
+          if (!extractedExists) {
+            const entries = await fs.readdir(zipDir);
+            let nestedExe = null;
+            for (const e of entries) {
+              const fullPath = path.join(zipDir, e);
+              if ((await pathExists(fullPath)) && path.extname(fullPath).toLowerCase() === ".exe") {
+                nestedExe = fullPath;
+                break;
+              }
+            }
+            if (nestedExe) {
+              await fs.rename(nestedExe, borepubExe);
+            } else {
+              await fs.rm(zipDir, { recursive: true, force: true });
+              return jsonResponse(res, 500, { error: "bore.exe nao encontrado dentro do arquivo baixado." });
+            }
+          } else {
+            await fs.rename(extractedExe, borepubExe);
+          }
+          await fs.rm(zipDir, { recursive: true, force: true });
+          const ipStatusPath = path.join(serverRecord.path, ".dsm-ip-status.json");
+          let ipStatus = {};
+          try {
+            const raw = await fs.readFile(ipStatusPath, "utf8");
+            ipStatus = JSON.parse(raw);
+          } catch {}
+          ipStatus.borepubLocalPath = borepubExe;
+          await fs.mkdir(path.dirname(ipStatusPath), { recursive: true });
+          await fs.writeFile(ipStatusPath, JSON.stringify(ipStatus, null, 2), "utf8");
+          return jsonResponse(res, 200, { downloaded: true, path: borepubExe, size: buffer.length });
+        } catch (error) {
+          return jsonResponse(res, 500, { error: `Falha ao baixar bore.pub: ${error.message}` });
+        }
+      }
 
      if (req.method === "POST" && url.pathname === "/api/server/borepub/start") {
        const serverRecord = await resolveServerForRequest({ req, user, url });

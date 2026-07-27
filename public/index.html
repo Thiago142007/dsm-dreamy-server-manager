@@ -149,11 +149,12 @@
 
       <section id="page-versions" data-page="versions" class="page-section is-hidden">
         <article id="subServerFilesDropZone" class="panel-card upload-dropzone">
-          <h2>Versoes Paper</h2>
-          <p>Escolha se este servidor sera Paper ou BungeeCord.</p>
+          <h2>Versoes</h2>
+          <p>Escolha se este servidor sera Paper, BungeeCord ou Bedrock.</p>
           <div class="server-kind-picker">
             <button id="selectPaperKindButton" type="button" class="button-muted">Paper</button>
             <button id="selectBungeeKindButton" type="button" class="button-muted">BungeeCord</button>
+            <button id="selectBedrockKindButton" type="button" class="button-muted">Bedrock</button>
           </div>
           <p id="versionsStatusText" class="muted-text">Selecione o tipo de servidor para instalar.</p>
 
@@ -168,6 +169,14 @@
           <div id="bungeeInstallPanel" class="is-hidden">
             <p>Para proxy BungeeCord, baixe o jar oficial e habilite a aba <strong>Servers</strong> para criar sub-servidores.</p>
             <button id="installBungeeButton" type="button">Instalar BungeeCord</button>
+          </div>
+
+          <div id="bedrockInstallPanel" class="is-hidden">
+            <p>Para servidor Bedrock, selecione uma versao e instale o Bedrock Dedicated Server.</p>
+            <div class="versions-toolbar">
+              <select id="bedrockVersionSelect"></select>
+              <button id="downloadSelectedBedrockVersionButton" type="button">Instalar Bedrock</button>
+            </div>
           </div>
           <ul id="paperVersionsList" class="versions-list"></ul>
         </article>
@@ -290,8 +299,7 @@
           <h2>Playit</h2>
           <p class="muted-text">Conecte sua conta Playit para obter o IP do servidor.</p>
           <div id="playitLoginForm" class="inline-form">
-            <input id="playitUsername" placeholder="Usuario Playit" />
-            <input id="playitPassword" type="password" placeholder="Senha Playit" />
+            <input id="playitSecretKey" placeholder="Chave Secreta Playit" />
             <button id="playitLoginButton" type="button">Entrar</button>
           </div>
           <div id="playitIpDisplay" class="is-hidden">

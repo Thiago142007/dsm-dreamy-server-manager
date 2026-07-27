@@ -27,4 +27,5 @@ test("java manager resolves java major for server kind", () => {
   assert.equal(resolveJavaMajorForServer({ serverKind: "paper", paperVersion: "1.21.8" }), 21);
   assert.equal(resolveJavaMajorForServer({ serverKind: "paper", paperVersion: "1.16.5" }), 8);
   assert.equal(resolveJavaMajorForServer({ serverKind: "bungeecord", paperVersion: "bungeecord" }), 17);
+  assert.equal(resolveJavaMajorForServer({ serverKind: "bedrock", paperVersion: "1.21.11" }), 0);
 });

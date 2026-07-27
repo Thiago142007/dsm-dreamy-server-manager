@@ -44,6 +44,9 @@ function resolveJavaMajorForServer({ serverKind = "paper", paperVersion = "" } =
   if (normalizedKind === "bungeecord") {
     return 17;
   }
+  if (normalizedKind === "bedrock") {
+    return 0;
+  }
   return resolveJavaMajorForPaperVersion(paperVersion);
 }
 

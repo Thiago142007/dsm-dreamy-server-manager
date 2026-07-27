@@ -63,6 +63,72 @@ const PAPER_VERSIONS = {
   "1.7.10": "https://fill-data.papermc.io/v1/objects/33772078d92e9dbb027602da016524ef29af5b4c12eaddac1fe2465b01108185/paper-1.7.10-2025.jar",
 };
 
+const BEDROCK_VERSIONS = {
+  "1.21.11": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.21.11.zip",
+  "1.21.10": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.21.10.zip",
+  "1.21.9": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.21.9.zip",
+  "1.21.8": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.21.8.zip",
+  "1.21.7": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.21.7.zip",
+  "1.21.6": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.21.6.zip",
+  "1.21.5": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.21.5.zip",
+  "1.21.4": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.21.4.zip",
+  "1.21.3": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.21.3.zip",
+  "1.21.2": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.21.2.zip",
+  "1.21.1": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.21.1.zip",
+  "1.21.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.21.0.zip",
+  "1.20.80": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.20.80.zip",
+  "1.20.70": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.20.70.zip",
+  "1.20.60": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.20.60.zip",
+  "1.20.50": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.20.50.zip",
+  "1.20.40": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.20.40.zip",
+  "1.20.30": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.20.30.zip",
+  "1.20.20": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.20.20.zip",
+  "1.20.10": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.20.10.zip",
+  "1.20.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.20.0.zip",
+  "1.19.80": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.19.80.zip",
+  "1.19.70": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.19.70.zip",
+  "1.19.60": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.19.60.zip",
+  "1.19.50": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.19.50.zip",
+  "1.19.40": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.19.40.zip",
+  "1.19.30": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.19.30.zip",
+  "1.19.20": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.19.20.zip",
+  "1.19.10": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.19.10.zip",
+  "1.19.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.19.0.zip",
+  "1.18.30": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.18.30.zip",
+  "1.18.20": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.18.20.zip",
+  "1.18.10": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.18.10.zip",
+  "1.18.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.18.0.zip",
+  "1.17.40": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.17.40.zip",
+  "1.17.30": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.17.30.zip",
+  "1.17.20": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.17.20.zip",
+  "1.17.10": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.17.10.zip",
+  "1.17.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.17.0.zip",
+  "1.16.200": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.16.200.zip",
+  "1.16.100": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.16.100.zip",
+  "1.16.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.16.0.zip",
+  "1.14.60": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.14.60.zip",
+  "1.14.50": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.14.50.zip",
+  "1.14.40": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.14.40.zip",
+  "1.14.30": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.14.30.zip",
+  "1.14.20": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.14.20.zip",
+  "1.14.10": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.14.10.zip",
+  "1.14.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.14.0.zip",
+  "1.13.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.13.0.zip",
+  "1.12.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.12.0.zip",
+  "1.11.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.11.0.zip",
+  "1.10.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.10.0.zip",
+  "1.9.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.9.0.zip",
+  "1.8.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.8.0.zip",
+  "1.7.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.7.0.zip",
+  "1.6.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.6.0.zip",
+  "1.5.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.5.0.zip",
+  "1.4.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.4.0.zip",
+  "1.3.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.3.0.zip",
+  "1.2.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.2.0.zip",
+  "1.1.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.1.0.zip",
+  "1.0.0": "https://minecraft.azureedge.net/bin-linux/bedrock-server-1.0.0.zip",
+};
+
 function listPaperVersions() {
   return Object.entries(PAPER_VERSIONS)
     .filter(([version]) => /^\d+(?:\.\d+)*$/.test(version))
@@ -76,8 +142,24 @@ function getPaperVersionUrl(version) {
   return PAPER_VERSIONS[version] || null;
 }
 
+function listBedrockVersions() {
+  return Object.entries(BEDROCK_VERSIONS)
+    .filter(([version]) => /^\d+(?:\.\d+)*$/.test(version))
+    .map(([version, url]) => ({
+      version,
+      url,
+    }));
+}
+
+function getBedrockVersionUrl(version) {
+  return BEDROCK_VERSIONS[version] || null;
+}
+
 module.exports = {
   PAPER_VERSIONS,
+  BEDROCK_VERSIONS,
   listPaperVersions,
   getPaperVersionUrl,
+  listBedrockVersions,
+  getBedrockVersionUrl,
 };

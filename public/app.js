@@ -105,8 +105,7 @@ const state = {
    playitLoggedIn: false,
    borepubRunning: false,
    borepubProcess: null,
-   borepubDownloadUrl: "https://github.com/dsnet/bore/releases/download/v0.4.2/bore.exe",
-   borepubLocalPath: "",
+borepubLocalPath: "",
    playitCredentialsStored: false,
  };
 
@@ -280,13 +279,16 @@ function updateExportImportNavVisibility() {
 }
 
 function setVersionKind(kind) {
-  const safeKind = kind === "bungeecord" ? "bungeecord" : "paper";
+  const safeKind = kind === "bungeecord" ? "bungeecord" : kind === "bedrock" ? "bedrock" : "paper";
   state.selectedVersionKind = safeKind;
   const isPaper = safeKind === "paper";
+  const isBedrock = safeKind === "bedrock";
   elements.paperInstallPanel.classList.toggle("is-hidden", !isPaper);
-  elements.bungeeInstallPanel.classList.toggle("is-hidden", isPaper);
+  elements.bungeeInstallPanel.classList.toggle("is-hidden", !isBedrock && !isPaper);
+  elements.bedrockInstallPanel.classList.toggle("is-hidden", !isBedrock);
   elements.selectPaperKindButton.classList.toggle("is-active", isPaper);
-  elements.selectBungeeKindButton.classList.toggle("is-active", !isPaper);
+  elements.selectBungeeKindButton.classList.toggle("is-active", !isPaper && !isBedrock);
+  elements.selectBedrockKindButton.classList.toggle("is-active", isBedrock);
 }
 
 function getSelectedPluginSubServer() {
@@ -298,12 +300,20 @@ function getSelectedPluginSubServer() {
 
 function syncPluginTargetFromServer() {
   const isBungee = state.serverKind === "bungeecord";
+  const isBedrock = state.serverKind === "bedrock";
   const currentVersion = state.serverVersion || "";
   elements.pluginSubServerWrap.classList.toggle("is-hidden", !isBungee);
-  elements.pluginServerVersionWrap.classList.toggle("is-hidden", isBungee);
-  elements.pluginServerVersionInput.readOnly = isBungee;
+  elements.pluginServerVersionWrap.classList.toggle("is-hidden", isBungee || isBedrock);
+  elements.pluginServerVersionInput.readOnly = isBungee || isBedrock;
 
-  if (!isBungee) {
+  if (!isBungee && !isBedrock) {
+    state.pluginTargetSubServerId = "";
+    elements.pluginSubServerSelect.innerHTML = "";
+    elements.pluginServerVersionInput.value = currentVersion;
+    return;
+  }
+
+  if (isBedrock) {
     state.pluginTargetSubServerId = "";
     elements.pluginSubServerSelect.innerHTML = "";
     elements.pluginServerVersionInput.value = currentVersion;
@@ -340,9 +350,16 @@ function getSelectedPropertiesSubServer() {
 
 function syncPropertiesTargetFromServer() {
   const isBungee = state.serverKind === "bungeecord";
+  const isBedrock = state.serverKind === "bedrock";
   elements.propertiesSubServerWrap.classList.toggle("is-hidden", !isBungee);
 
-  if (!isBungee) {
+  if (!isBungee && !isBedrock) {
+    state.propertiesTargetSubServerId = "";
+    elements.propertiesSubServerSelect.innerHTML = "";
+    return;
+  }
+
+  if (isBedrock) {
     state.propertiesTargetSubServerId = "";
     elements.propertiesSubServerSelect.innerHTML = "";
     return;
@@ -387,9 +404,16 @@ function getSelectedConsoleTarget() {
 function syncConsoleTargetFromServer() {
   if (!elements.consoleTargetWrap || !elements.consoleTargetSelect) return;
   const isBungee = state.serverKind === "bungeecord";
+  const isBedrock = state.serverKind === "bedrock";
   elements.consoleTargetWrap.classList.toggle("is-hidden", !isBungee);
 
-  if (!isBungee) {
+  if (!isBungee && !isBedrock) {
+    state.consoleTargetSubServerId = "";
+    elements.consoleTargetSelect.innerHTML = "";
+    return;
+  }
+
+  if (isBedrock) {
     state.consoleTargetSubServerId = "";
     elements.consoleTargetSelect.innerHTML = "";
     return;
@@ -418,6 +442,9 @@ function syncConsoleTargetFromServer() {
 
 function getPluginTargetDescriptor() {
   const serverVersion = elements.pluginServerVersionInput.value.trim();
+  if (state.serverKind === "bedrock") {
+    return { serverVersion, subServerId: "" };
+  }
   if (state.serverKind !== "bungeecord") {
     return { serverVersion, subServerId: "" };
   }
@@ -886,9 +913,13 @@ const elements = {
   paperVersionsList: document.getElementById("paperVersionsList"),
   selectPaperKindButton: document.getElementById("selectPaperKindButton"),
   selectBungeeKindButton: document.getElementById("selectBungeeKindButton"),
+  selectBedrockKindButton: document.getElementById("selectBedrockKindButton"),
   paperInstallPanel: document.getElementById("paperInstallPanel"),
   bungeeInstallPanel: document.getElementById("bungeeInstallPanel"),
+  bedrockInstallPanel: document.getElementById("bedrockInstallPanel"),
   installBungeeButton: document.getElementById("installBungeeButton"),
+  downloadSelectedBedrockVersionButton: document.getElementById("downloadSelectedBedrockVersionButton"),
+  bedrockVersionSelect: document.getElementById("bedrockVersionSelect"),
   versionsStatusText: document.getElementById("versionsStatusText"),
   createSubServerForm: document.getElementById("createSubServerForm"),
   newSubServerNameInput: document.getElementById("newSubServerNameInput"),
@@ -982,8 +1013,7 @@ const elements = {
    playitPanel: document.getElementById("playitPanel"),
    borepubPanel: document.getElementById("borepubPanel"),
    playitLoginButton: document.getElementById("playitLoginButton"),
-   playitUsername: document.getElementById("playitUsername"),
-   playitPassword: document.getElementById("playitPassword"),
+   playitSecretKey: document.getElementById("playitSecretKey"),
    playitIpDisplay: document.getElementById("playitIpDisplay"),
    playitIpCopyButton: document.getElementById("playitIpCopyButton"),
    borepubStatusText: document.getElementById("borepubStatusText"),
@@ -1356,11 +1386,13 @@ async function loadServerInfo() {
   }
   const data = await requestJson("/api/server/info");
   state.serverVersion = String(data.paperVersion || "");
-  state.serverKind = String(data.serverKind || "paper").toLowerCase() === "bungeecord" ? "bungeecord" : "paper";
+  state.serverKind = String(data.serverKind || "paper").toLowerCase();
   elements.pluginServerVersionInput.value = state.serverVersion;
   elements.serverVersionText.textContent =
     state.serverKind === "bungeecord"
       ? "BungeeCord"
+      : state.serverKind === "bedrock"
+      ? "Bedrock"
       : state.serverVersion || "Nao instalada";
   elements.serverIpText.textContent = data.serverAddress || "0.0.0.0:25565";
   setVersionKind(state.serverKind);
@@ -1370,12 +1402,14 @@ async function loadServerInfo() {
   elements.versionsStatusText.textContent =
     state.serverKind === "bungeecord"
       ? "Servidor atual: BungeeCord"
+      : state.serverKind === "bedrock"
+      ? "Servidor atual: Bedrock"
       : `Servidor atual: Paper ${state.serverVersion || "(nao instalado)"}`;
   updateServersNavVisibility();
   updateExportImportNavVisibility();
-  if (state.serverKind !== "bungeecord") {
+  if (state.serverKind !== "bungeecord" && state.serverKind !== "bedrock") {
     state.bungeeManualNoticeServerId = "";
-  } else {
+  } else if (state.serverKind === "bungeecord") {
     showManualBungeeConfigNotice();
   }
   const ipStatus = await requestJson("/api/server/ip-status").catch(() => null);
@@ -2921,6 +2955,7 @@ async function extractFileFromContextMenu() {
 
 async function loadPaperVersions() {
   const { items } = await requestJson("/api/paper/versions");
+  const { items: bedrockItems } = await requestJson("/api/bedrock/versions");
   elements.paperVersionSelect.innerHTML = "";
   elements.newSubServerVersionSelect.innerHTML = "";
   elements.paperVersionsList.innerHTML = "";
@@ -2955,11 +2990,24 @@ async function loadPaperVersions() {
     elements.paperVersionSelect.value = items[0].version;
     elements.newSubServerVersionSelect.value = items[0].version;
   }
+
+  elements.bedrockVersionSelect.innerHTML = "";
+  for (const item of bedrockItems) {
+    const option = document.createElement("option");
+    option.value = item.version;
+    option.textContent = item.version;
+    elements.bedrockVersionSelect.append(option);
+  }
+
+  if (bedrockItems.length) {
+    elements.bedrockVersionSelect.value = bedrockItems[0].version;
+  }
 }
 
 async function downloadPaperVersion(version) {
   const isBungee = state.selectedVersionKind === "bungeecord";
-  const targetKind = isBungee ? "bungeecord" : "paper";
+  const isBedrock = state.selectedVersionKind === "bedrock";
+  const targetKind = isBungee ? "bungeecord" : isBedrock ? "bedrock" : "paper";
   let installMode = "";
   let response;
   try {
@@ -2969,7 +3017,7 @@ async function downloadPaperVersion(version) {
       body: JSON.stringify({ version, serverKind: targetKind }),
     });
   } catch (error) {
-    if (isBungee || !String(error.message || "").toLowerCase().includes("version already installed")) {
+    if ((isBungee || isBedrock) || !String(error.message || "").toLowerCase().includes("version already installed")) {
       throw error;
     }
 
@@ -2996,6 +3044,8 @@ async function downloadPaperVersion(version) {
   if (targetKind === "bungeecord") {
     showToast("BungeeCord instalado com sucesso. Aba Servers liberada.", "success", 4200);
     showManualBungeeConfigNotice({ force: true });
+  } else if (targetKind === "bedrock") {
+    showToast(`Bedrock ${response.version} baixado como ${response.fileName}.`, "success");
   } else if (response.installModeApplied === "reinstall") {
     showToast("Servidor reinstalado e Paper baixado com sucesso.", "warning", 4200);
   } else {
@@ -3549,9 +3599,16 @@ elements.downloadSelectedVersionButton.addEventListener("click", () => {
 });
 elements.selectPaperKindButton.addEventListener("click", () => setVersionKind("paper"));
 elements.selectBungeeKindButton.addEventListener("click", () => setVersionKind("bungeecord"));
+elements.selectBedrockKindButton.addEventListener("click", () => setVersionKind("bedrock"));
 elements.installBungeeButton.addEventListener("click", () => {
   setVersionKind("bungeecord");
   downloadPaperVersion("bungeecord").catch((error) => showToast(error.message, "error"));
+});
+elements.downloadSelectedBedrockVersionButton.addEventListener("click", () => {
+  const version = elements.bedrockVersionSelect.value;
+  if (!version) return;
+  setVersionKind("bedrock");
+  downloadPaperVersion(version).catch((error) => showToast(error.message, "error"));
 });
 
 elements.createSubServerForm.addEventListener("submit", async (event) => {
@@ -3924,17 +3981,16 @@ async function selectBorepub() {
 }
 
 async function handlePlayitLogin() {
-  const username = elements.playitUsername.value.trim();
-  const password = elements.playitPassword.value.trim();
-  if (!username || !password) {
-    showToast("Preencha usuario e senha do Playit.", "warning");
+  const secretKey = elements.playitSecretKey.value.trim();
+  if (!secretKey) {
+    showToast("Preencha a chave secreta do Playit.", "warning");
     return;
   }
   try {
     const response = await requestJson("/api/server/playit/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ secretKey }),
     });
     state.playitLoggedIn = true;
     state.playitIp = String(response.ip || "");
