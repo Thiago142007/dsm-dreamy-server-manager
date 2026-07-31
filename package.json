@@ -2,6 +2,7 @@
   "name": "dsm-dreamy-server-manager",
   "version": "0.1.0",
   "description": "DSM - Dreamy Server Manager (Windows-first)",
+  "author": "Dreamy",
   "main": "electron/main.js",
   "scripts": {
     "start": "node src/server.js",

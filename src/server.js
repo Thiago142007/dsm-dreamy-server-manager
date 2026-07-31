@@ -2860,6 +2860,12 @@ function createSubServerRuntime(serverRecord, subServer, { javaExecutable = "jav
 
   async function readNormalizedServerMeta(serverDir) {
     const meta = await readServerMeta(serverDir);
+    if (!meta.serverKind) {
+      const detected = await detectImportedServerKind(serverDir);
+      if (detected && detected !== "paper") {
+        meta.serverKind = detected;
+      }
+    }
     return normalizeBungeeMeta(meta);
   }
 
@@ -4286,6 +4292,7 @@ if (req.method === "POST" && url.pathname === "/api/paper/download") {
       url: urlValue,
       destinationPath,
     });
+    await extractZipArchive(serverRecord.path, fileName);
     await patchServerMeta(serverRecord.path, {
       serverKind: "bedrock",
       paperVersion: version,

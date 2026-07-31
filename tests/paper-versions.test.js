@@ -18,22 +18,22 @@ test("listPaperVersions returns structured objects", () => {
 });
 
 test("bedrock versions catalog contains key releases", () => {
-  assert.equal(typeof BEDROCK_VERSIONS["1.21.11"], "string");
-  assert.equal(typeof BEDROCK_VERSIONS["1.20.80"], "string");
-  assert.equal(typeof BEDROCK_VERSIONS["1.19.80"], "string");
+  assert.equal(typeof BEDROCK_VERSIONS["1.21.132.1"], "string");
+  assert.equal(typeof BEDROCK_VERSIONS["1.21.31.04"], "string");
+  assert.equal(typeof BEDROCK_VERSIONS["1.26.33.1"], "string");
 });
 
 test("listBedrockVersions returns structured objects", () => {
   const items = listBedrockVersions();
   assert.equal(Array.isArray(items), true);
   assert.equal(items.length > 10, true);
-  assert.equal(items[0].version, "1.21.11");
+  assert.equal(items[0].version, "1.21.31.04");
   assert.match(items[0].url, /^https:\/\//);
   assert.equal(items.every((item) => !item.version.includes("-")), true);
 });
 
 test("getBedrockVersionUrl returns url for known version", () => {
-  const url = getBedrockVersionUrl("1.21.11");
+  const url = getBedrockVersionUrl("1.21.132.1");
   assert.notEqual(url, null);
   assert.match(url, /^https:\/\//);
 });
