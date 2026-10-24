@@ -1,0 +1,71 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DSM",
+  "version": "0.1.0",
+  "identifier": "com.dsm.minecraftpanel",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://127.0.0.1:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "security": {
+      "csp": "default-src 'self' tauri: asset: http://asset.localhost data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' tauri:; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost data: blob:; media-src 'self' asset: http://asset.localhost data: blob:; connect-src 'self' ipc: http://ipc.localhost; font-src 'self' data:",
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$DOWNLOAD/**",
+          "$DOCUMENT/**",
+          "$DESKTOP/**"
+        ]
+      }
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "DSM — Painel de Servidor Minecraft",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 940,
+        "minHeight": 600,
+        "resizable": true,
+        "decorations": true,
+        "theme": "Dark",
+        "dragDropEnabled": true
+      }
+    ]
+  },
+  "plugins": {
+    "fs": {
+      "requireLiteralLeadingDot": false
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "deb",
+      "appimage"
+    ],
+    "category": "Game",
+    "copyright": "",
+    "shortDescription": "Painel de servidor de Minecraft",
+    "longDescription": "Painel local para criar, gerenciar e hospedar servidores de Minecraft Java e Bedrock no Linux, com interface inspirada no Minecraft.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "linux": {
+      "deb": {
+        "depends": [
+          "libgtk-3-0",
+          "libwebkit2gtk-4.1-0"
+        ]
+      }
+    }
+  }
+}

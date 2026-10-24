@@ -1,0 +1,35 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Permissões do DSM: ler/escrever apenas dentro de ~/.dsm e nos arquivos escolhidos pelo usuário.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
+    "core:event:default",
+    "dialog:default",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "fs:default",
+    "fs:allow-read-file",
+    "fs:allow-write-file",
+    "fs:allow-read-dir",
+    "fs:allow-exists",
+    "opener:default",
+    "os:default",
+    "notification:default"
+  ],
+  "scope": {
+    "allow": [
+      { "path": "$HOME/.dsm/**" },
+      { "path": "$HOME/.minecraft/**" },
+      { "path": "$DOWNLOAD/**" },
+      { "path": "$DESKTOP/**" },
+      { "path": "$DOCUMENT/**" }
+    ],
+    "deny": []
+  }
+}

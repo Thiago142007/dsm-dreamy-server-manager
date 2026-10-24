@@ -1,0 +1,50 @@
+[package]
+name = "dsm"
+version = "0.1.0"
+description = "DSM - Painel de servidor de Minecraft para Linux"
+authors = ["DSM"]
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "dsm_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+# Nota: o tauri-build não é publicado a cada release do tauri; a última versão
+# estável disponível no crates.io é a 2.7.1, e ela é compatível com o tauri 2.12.
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+tauri = { version = "2.12", features = ["protocol-asset"] }
+tauri-plugin-dialog = "2.8"
+tauri-plugin-fs = "2.6"
+tauri-plugin-opener = "2.7"
+tauri-plugin-os = "2.4"
+tauri-plugin-notification = "2.5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "io-util", "sync", "time", "process"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+futures-util = "0.3"
+zip = { version = "2", default-features = false, features = ["deflate", "bzip2", "zstd"] }
+tar = "0.4"
+flate2 = "1"
+image = "0.25"
+chrono = { version = "0.4", features = ["serde"] }
+walkdir = "2"
+dirs = "5"
+base64 = "0.22"
+uuid = { version = "1", features = ["v4"] }
+sysinfo = "0.33"
+regex = "1"
+lazy_static = "1"
+cron = "0.15"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
